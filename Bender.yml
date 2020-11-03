@@ -4,6 +4,9 @@ package:
 dependencies:
   tech_cells_generic: { git: "https://github.com/pulp-platform/tech_cells_generic.git", version: 0.1.1 }
 
+export_include_dirs:
+  - rtl/include
+
 sources:
   include_dirs:
     - rtl/include
@@ -32,13 +35,23 @@ sources:
     - rtl/riscv_apu_disp.sv
     - rtl/riscv_fetch_fifo.sv
     - rtl/riscv_L0_buffer.sv
-    - target: asic
+    - rtl/riscv_pmp.sv
+    - target: any(rtl, asic)
       files:
         - rtl/register_file_test_wrap.sv
         - rtl/riscv_register_file_latch.sv
     - target: not(asic)
       files:
         - rtl/riscv_register_file.sv
-    - target: rtl
+    - target: all(rtl, not(synthesis))
       files:
         - rtl/riscv_tracer.sv
+    - target: verilator
+      files:
+        - rtl/riscv_register_file.sv
+    - target: xilinx
+      files:
+        - rtl/register_file_test_wrap.sv
+        - rtl/riscv_register_file.sv
+    # TODO: tb_riscv
+
