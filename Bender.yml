@@ -2,7 +2,8 @@ package:
   name: riscv
 
 dependencies:
-  tech_cells_generic: { git: "https://github.com/pulp-platform/tech_cells_generic.git", version: 0.1.1 }
+  tech_cells_generic: { git: "https://github.com/pulp-platform/tech_cells_generic.git", version: 0.2.3 }
+  fpnew: { git: "https://github.com/pulp-platform/fpnew.git", version: 0.6.5 }
 
 export_include_dirs:
   - rtl/include
