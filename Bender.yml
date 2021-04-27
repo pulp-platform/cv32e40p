@@ -26,6 +26,7 @@ sources:
     - rtl/riscv_ex_stage.sv
     - rtl/riscv_hwloop_controller.sv
     - rtl/riscv_hwloop_regs.sv
+    - rtl/register_file_test_wrap.sv
     - rtl/riscv_id_stage.sv
     - rtl/riscv_if_stage.sv
     - rtl/riscv_load_store_unit.sv
@@ -37,22 +38,17 @@ sources:
     - rtl/riscv_fetch_fifo.sv
     - rtl/riscv_L0_buffer.sv
     - rtl/riscv_pmp.sv
-    - target: any(rtl, asic)
+
+    # Different register file implementations. By default, use the latch based
+    # register file (unless we target verilator or FPGAs).
+    - target: all(any(all(not(verilator), not(fpga)), cv32e40p_use_latch_regfile), not(cv32e40p_use_ff_regfile))
       files:
-        - rtl/register_file_test_wrap.sv
         - rtl/riscv_register_file_latch.sv
-    - target: not(asic)
+    - target: all(any(verilator, fpga, cv32e40p_use_ff_regfile), not(cv32e40p_use_latch_regfile))
       files:
         - rtl/riscv_register_file.sv
-    - target: all(rtl, not(synthesis))
+
+    - target: all(any(test, cv32e40p_include_tracer), not(cv32e40p_exclude_tracer))
       files:
         - rtl/riscv_tracer.sv
-    - target: verilator
-      files:
-        - rtl/riscv_register_file.sv
-    - target: xilinx
-      files:
-        - rtl/register_file_test_wrap.sv
-        - rtl/riscv_register_file.sv
-    # TODO: tb_riscv
 
