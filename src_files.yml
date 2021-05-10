@@ -17,6 +17,7 @@ cv32e40p_regfile_rtl:
     rtl,
     tsmc55,
     gf22,
+    tsmc65,
   ]
   incdirs: [
     ./rtl/include,
@@ -35,6 +36,7 @@ cv32e40p:
   ]
   files: [
     ./rtl/include/cv32e40p_apu_core_pkg.sv,
+    ./rtl/include/cv32e40p_fpu_pkg.sv,
     ./rtl/include/cv32e40p_pkg.sv,
     ./bhv/include/cv32e40p_tracer_pkg.sv,
     ./rtl/cv32e40p_alu.sv,
