@@ -668,7 +668,7 @@ module cv32e40p_pmp import cv32e40p_pkg::*;
    end
 
 
-   enum logic {IDLE, GIVE_ERROR} data_err_state_q, data_err_state_n;
+   enum logic {PMP_IDLE, GIVE_ERROR} data_err_state_q, data_err_state_n;
 
    always_comb
    begin
@@ -676,7 +676,7 @@ module cv32e40p_pmp import cv32e40p_pkg::*;
       data_err_state_n = data_err_state_q;
       unique case(data_err_state_q)
 
-         IDLE:
+         PMP_IDLE:
          begin
             if(data_err_int)
                data_err_state_n = GIVE_ERROR;
@@ -686,7 +686,7 @@ module cv32e40p_pmp import cv32e40p_pkg::*;
          begin
             data_err_o = 1'b1;
             if(data_err_ack_i)
-               data_err_state_n = IDLE;
+               data_err_state_n = PMP_IDLE;
          end
       endcase
    end
@@ -694,7 +694,7 @@ module cv32e40p_pmp import cv32e40p_pkg::*;
 
    always_ff @(posedge clk or negedge rst_n) begin
       if(~rst_n) begin
-          data_err_state_q <= IDLE;
+          data_err_state_q <= PMP_IDLE;
       end else begin
           data_err_state_q <= data_err_state_n;
       end

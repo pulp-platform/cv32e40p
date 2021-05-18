@@ -113,14 +113,27 @@ module cv32e40p_register_file
    //-----------------------------------------------------------------------------
    // WRITE : SAMPLE INPUT DATA
    //---------------------------------------------------------------------------
-
-     cv32e40p_clock_gate CG_WE_GLOBAL
-     (
-      .clk_i        ( clk             ),
-      .en_i         ( we_a_i | we_b_i ),
-      .scan_cg_en_i ( scan_cg_en_i    ),
-      .clk_o        ( clk_int         )
+`ifndef SYNTHESIS
+    
+    cv32e40p_clock_gate CG_WE_GLOBAL
+      (
+        .clk_i        ( clk             ),
+        .en_i         ( we_a_i | we_b_i ),
+        .scan_cg_en_i ( scan_cg_en_i    ),
+        .clk_o        ( clk_int         )
       );
+
+  `else
+    //tech cell
+    pulp_clock_gating CG_WE_GLOBAL
+      (
+        .clk_i(clk),
+        .en_i(we_a_i | we_b_i ),
+        .test_en_i(scan_cg_en_i),
+        .clk_o( clk_int )
+      );
+  `endif
+
 
    // use clk_int here, since otherwise we don't want to write anything anyway
    always_ff @(posedge clk_int, negedge rst_n)
@@ -161,13 +174,27 @@ module cv32e40p_register_file
    generate
       for(x = 1; x < NUM_TOT_WORDS; x++)
         begin : gen_clock_gate
-             cv32e40p_clock_gate clock_gate_i
-             (
+           `ifndef SYNTHESIS
+
+          cv32e40p_clock_gate clock_gate_i
+            (
               .clk_i        ( clk_int                               ),
               .en_i         ( waddr_onehot_a[x] | waddr_onehot_b[x] ),
               .scan_cg_en_i ( scan_cg_en_i                          ),
               .clk_o        ( mem_clocks[x]                         )
-              );
+            );
+
+        `else
+          //tech cell
+          pulp_clock_gating clock_gate_i
+            (
+              .clk_i(clk_int),
+              .en_i(waddr_onehot_a[x] | waddr_onehot_b[x] ),
+              .test_en_i(scan_cg_en_i),
+              .clk_o(mem_clocks[x])
+            );
+        `endif
+
         end
    endgenerate
 
