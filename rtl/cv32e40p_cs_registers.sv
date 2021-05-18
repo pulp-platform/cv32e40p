@@ -176,7 +176,7 @@ module cv32e40p_cs_registers import cv32e40p_pkg::*;
     | (32'(PULP_XPULP || PULP_CLUSTER) << 23)  // X - Non-standard extensions present
     | (32'(MXL)                        << 30); // M-XLEN
 
-  localparam MHPMCOUNTER_WIDTH  = 64;
+  localparam MHPMCOUNTER_WIDTH  = 32;
 
   // This local parameter when set to 1 makes the Perf Counters not compliant with RISC-V
   // as it does not implement mcycle and minstret
@@ -1514,7 +1514,7 @@ end //PULP_SECURE
             end else begin
               if (mhpmcounter_write_lower[cnt_gidx]) begin
                 mhpmcounter_q[cnt_gidx][31:0] <= csr_wdata_int;
-              end else if (mhpmcounter_write_upper[cnt_gidx]) begin
+              end else if (mhpmcounter_write_upper[cnt_gidx] && MHPMCOUNTER_WIDTH == 64) begin
                 mhpmcounter_q[cnt_gidx][63:32] <= csr_wdata_int;
               end else if (mhpmcounter_write_increment[cnt_gidx]) begin
                 mhpmcounter_q[cnt_gidx] <= mhpmcounter_increment[cnt_gidx];
