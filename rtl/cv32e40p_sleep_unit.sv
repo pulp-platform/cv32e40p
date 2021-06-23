@@ -152,6 +152,12 @@ module cv32e40p_sleep_unit
   // Fetch enable for Controller
   assign fetch_enable_o = fetch_enable_q;
 
+  //////////////////////////////////////////////////////////////////////////////
+  // Clock gating
+  //////////////////////////////////////////////////////////////////////////////
+
+  `ifndef PULP_FPGA_EMUL
+
   // Main clock gate of CV32E40P
   //tech cell
   pulp_clock_gating core_clock_gate_i
@@ -160,7 +166,17 @@ module cv32e40p_sleep_unit
       .en_i(clock_en),
       .test_en_i(scan_cg_en_i),
       .clk_o(clk_gated_o)
-    );
+  );
+
+  `else
+
+  // Clock gating is removed for FPGA implementation
+  // TODO Use core_clock_gating module as in RI5CY for handling clock bypass
+
+  assign clk_gated_o = clk_ungated_i;
+
+  `endif // !`ifndef PULP_FPGA_EMUL
+
 
   //----------------------------------------------------------------------------
   // Assertions
