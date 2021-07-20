@@ -657,7 +657,7 @@ parameter EXC_CAUSE_ECALL_UMODE  = 5'h08;
 parameter EXC_CAUSE_ECALL_MMODE  = 5'h0B;
 
 // Interrupt mask
-parameter IRQ_MASK = 32'hFFFF0888;
+parameter IRQ_MASK = 32'hFFFF_FFFF;
 
 // Trap mux selector
 parameter TRAP_MACHINE      = 2'b00;
