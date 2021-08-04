@@ -30,7 +30,7 @@ module cv32e40p_int_controller
     input logic rst_n,
 
     // External interrupt lines
-    input logic [31:0] irq_i,  // Level-triggered interrupt inputs
+    input logic [31:0] irq_i,      // Level-triggered interrupt inputs
     input logic        irq_sec_i,  // Interrupt secure bit from EU
 
     // To cv32e40p_controller
