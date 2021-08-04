@@ -42,7 +42,8 @@ module cv32e40p_core_log
   parameter PULP_CLUSTER        =  0,                   // PULP Cluster interface (incl. p.elw)
   parameter FPU                 =  0,                   // Floating Point Unit (interfaced via APU interface)
   parameter PULP_ZFINX          =  0,                   // Float-in-General Purpose registers
-  parameter NUM_MHPMCOUNTERS    =  1
+  parameter NUM_MHPMCOUNTERS    =  1,
+  parameter NUM_INTERRUPTS  =  32
 )
 (
   input logic        clk_i,
@@ -55,8 +56,8 @@ module cv32e40p_core_log
   // Log top level parameter values
   initial
   begin
-    $display("[cv32e40p_core]: PULP_XPULP = %d, PULP_CLUSTER = %d, FPU %d, PULP_ZFINX %d, NUM_MHPMCOUNTERS %d",
-      PULP_XPULP, PULP_CLUSTER, FPU, PULP_ZFINX, NUM_MHPMCOUNTERS);
+    $display("[cv32e40p_core]: PULP_XPULP = %d, PULP_CLUSTER = %d, FPU %d, PULP_ZFINX %d, NUM_MHPMCOUNTERS %d, NUM_INTERRUPTS %d",
+      PULP_XPULP, PULP_CLUSTER, FPU, PULP_ZFINX, NUM_MHPMCOUNTERS, NUM_INTERRUPTS);
   end
 
   // Log illegal instructions

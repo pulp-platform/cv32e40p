@@ -2408,7 +2408,10 @@ module cv32e40p_decoder import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*;
             CSR_MSTATUS,
               CSR_MEPC,
               CSR_MTVEC,
-              CSR_MCAUSE :
+              CSR_MTVT,
+              CSR_MCAUSE,
+              CSR_MINTTHRESH, // TODO: do we need to treat this as status reg? // TODO: gate when CLIC = 0
+              CSR_MINTSTATUS:
                 // Not illegal, but treat as status CSR for side effect handling
                 csr_status_o = 1'b1;
 
@@ -2416,6 +2419,8 @@ module cv32e40p_decoder import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*;
             CSR_MISA,
               CSR_MIE,
               CSR_MSCRATCH,
+//              CSR_MSCRATCHCSW,
+//              CSR_MSCRATCHCSWL,
               CSR_MTVAL,
               CSR_MIP :
                 ; // do nothing, not illegal

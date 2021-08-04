@@ -266,6 +266,7 @@ typedef enum logic[11:0] {
   CSR_MISA           = 12'h301,
   CSR_MIE            = 12'h304,
   CSR_MTVEC          = 12'h305,
+  CSR_MTVT           = 12'h307,
 
   // Performance counters
   CSR_MCOUNTEREN     = 12'h306,
@@ -306,6 +307,12 @@ typedef enum logic[11:0] {
   CSR_MCAUSE         = 12'h342,
   CSR_MTVAL          = 12'h343,
   CSR_MIP            = 12'h344,
+  CSR_MNXTI          = 12'h345,
+  CSR_MINTSTATUS     = 12'h346,
+  CSR_MINTTHRESH     = 12'h347,
+//  CSR_MSCRATCHCSW    = 12'h348,
+//  CSR_MSCRATCHCSWL   = 12'h349,
+  //CSR_MCLICBASE    = 12'h???
 
   // Physical memory protection (PMP)
   CSR_PMPCFG0        = 12'h3A0,         // Not included (USE_PMP = 0)
@@ -520,6 +527,16 @@ typedef enum logic[1:0] {
   PRIV_LVL_U = 2'b00
 } PrivLvl_t;
 
+// interrupt status (clic)
+typedef struct packed {
+  logic [31:24] mil;
+  logic [23:16] reserved;
+  // hardwired to '0
+  logic [15:8]  sil;
+  // hardwired to '0
+  logic [7:0]   uil;
+} Mintstatus_t;
+
 // Machine Vendor ID - OpenHW JEDEC ID is '2 decimal (bank 13)'
 parameter MVENDORID_OFFSET = 7'h2;      // Final byte without parity bit
 parameter MVENDORID_BANK = 25'hC;       // Number of continuation codes
@@ -657,7 +674,7 @@ parameter EXC_CAUSE_ECALL_UMODE  = 5'h08;
 parameter EXC_CAUSE_ECALL_MMODE  = 5'h0B;
 
 // Interrupt mask
-parameter IRQ_MASK = 32'hFFFF_FFFF;
+parameter IRQ_MASK = {32{1'b1}};
 
 // Trap mux selector
 parameter TRAP_MACHINE      = 2'b00;

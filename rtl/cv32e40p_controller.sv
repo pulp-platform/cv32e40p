@@ -31,7 +31,8 @@
 module cv32e40p_controller import cv32e40p_pkg::*;
 #(
   parameter PULP_CLUSTER = 0,
-  parameter PULP_XPULP   = 1
+  parameter PULP_XPULP   = 1,
+  parameter NUM_INTERRUPTS = 32
 )
 (
   input  logic        clk,                        // Gated clock
@@ -117,14 +118,15 @@ module cv32e40p_controller import cv32e40p_pkg::*;
   // Interrupt Controller Signals
   input  logic        irq_req_ctrl_i,
   input  logic        irq_sec_ctrl_i,
-  input  logic [4:0]  irq_id_ctrl_i,
+  input  logic [$clog2(NUM_INTERRUPTS)-1:0]  irq_id_ctrl_i,
+  input  logic [7:0]  irq_level_ctrl_i,
   input  logic        irq_wu_ctrl_i,
   input  PrivLvl_t    current_priv_lvl_i,
 
   output logic        irq_ack_o,
-  output logic [4:0]  irq_id_o,
+  output logic [$clog2(NUM_INTERRUPTS)-1:0]  irq_id_o,
 
-  output logic [4:0]  exc_cause_o,
+  output logic [$clog2(NUM_INTERRUPTS)-1:0]  exc_cause_o,
 
   // Debug Signal
   output logic         debug_mode_o,
@@ -147,7 +149,8 @@ module cv32e40p_controller import cv32e40p_pkg::*;
   output logic        csr_save_if_o,
   output logic        csr_save_id_o,
   output logic        csr_save_ex_o,
-  output logic [5:0]  csr_cause_o,
+  output logic [$clog2(NUM_INTERRUPTS):0]  csr_cause_o,
+  output logic [7:0]  csr_irq_level_o,
   output logic        csr_irq_sec_o,
   output logic        csr_restore_mret_id_o,
   output logic        csr_restore_uret_id_o,
@@ -235,7 +238,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
   logic debug_req_q;
   logic debug_req_pending;
 
-  // qualify wfi vs nosleep locally 
+  // qualify wfi vs nosleep locally
   logic wfi_active;
 
 
@@ -271,6 +274,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
     trap_addr_mux_o        = TRAP_MACHINE;
 
     csr_cause_o            = '0;
+    csr_irq_level_o        = '0;
     csr_irq_sec_o          = 1'b0;
 
     pc_mux_o               = PC_BOOT;
@@ -420,6 +424,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
 
           csr_save_cause_o  = 1'b1;
           csr_cause_o       = {1'b1,irq_id_ctrl_i};
+          csr_irq_level_o   = irq_level_ctrl_i;
           csr_save_if_o     = 1'b1;
         end
       end
@@ -454,7 +459,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
 
-            csr_cause_o       = {1'b0, data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT};
+            csr_cause_o       = {1'b0, data_we_ex_i ? $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_STORE_FAULT) : $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_LOAD_FAULT)};
             ctrl_fsm_ns       = FLUSH_WB;
 
           end  //data error
@@ -472,7 +477,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
 
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
 
-            csr_cause_o       = {1'b0, EXC_CAUSE_INSTR_FAULT};
+            csr_cause_o       = {1'b0, $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_INSTR_FAULT)};
             ctrl_fsm_ns       = FLUSH_WB;
 
 
@@ -520,6 +525,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
 
                 csr_save_cause_o  = 1'b1;
                 csr_cause_o       = {1'b1,irq_id_ctrl_i};
+                csr_irq_level_o   = irq_level_ctrl_i;
                 csr_save_id_o     = 1'b1;
               end
             else
@@ -735,6 +741,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
 
                 csr_save_cause_o  = 1'b1;
                 csr_cause_o       = {1'b1,irq_id_ctrl_i};
+                csr_irq_level_o   = irq_level_ctrl_i;
                 csr_save_id_o     = 1'b1;
 
                 ctrl_fsm_ns       = DECODE;
@@ -886,7 +893,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
             csr_save_cause_o  = 1'b1;
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
-            csr_cause_o       = {1'b0, data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT};
+            csr_cause_o       = {1'b0, data_we_ex_i ? $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_STORE_FAULT) : $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_LOAD_FAULT)};
             ctrl_fsm_ns       = FLUSH_WB;
             //putting illegal to 0 as if it was 1, the core is going to jump to the exception of the EX stage,
             //so the illegal was never executed
@@ -899,18 +906,18 @@ module cv32e40p_controller import cv32e40p_pkg::*;
           if(illegal_insn_q) begin
             csr_save_id_o     = 1'b1;
             csr_save_cause_o  = !debug_mode_q;
-            csr_cause_o       = {1'b0, EXC_CAUSE_ILLEGAL_INSN};
+            csr_cause_o       = {1'b0, $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_ILLEGAL_INSN)};
           end else begin
             unique case (1'b1)
               ebrk_insn_i: begin
                 csr_save_id_o     = 1'b1;
                 csr_save_cause_o  = 1'b1;
-                csr_cause_o       = {1'b0, EXC_CAUSE_BREAKPOINT};
+                csr_cause_o       = {1'b0, $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_BREAKPOINT)};
               end
               ecall_insn_i: begin
                 csr_save_id_o     = 1'b1;
                 csr_save_cause_o  = !debug_mode_q;
-                csr_cause_o       = {1'b0, current_priv_lvl_i == PRIV_LVL_U ? EXC_CAUSE_ECALL_UMODE : EXC_CAUSE_ECALL_MMODE};
+                csr_cause_o       = {1'b0, current_priv_lvl_i == PRIV_LVL_U ? $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_ECALL_UMODE) : $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_ECALL_MMODE)};
               end
               default:;
             endcase // unique case (1'b1)
@@ -954,6 +961,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
 
             csr_save_cause_o  = 1'b1;
             csr_cause_o       = {1'b1,irq_id_ctrl_i};
+            csr_irq_level_o   = irq_level_ctrl_i;
             csr_save_id_o     = 1'b1;
           end
         end
@@ -1000,7 +1008,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
             trap_addr_mux_o       = TRAP_MACHINE;
             //little hack during testing
             exc_pc_mux_o          = EXC_PC_EXCEPTION;
-            exc_cause_o           = data_we_ex_i ? EXC_CAUSE_LOAD_FAULT : EXC_CAUSE_STORE_FAULT;
+            exc_cause_o           = data_we_ex_i ? $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_LOAD_FAULT) : $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_STORE_FAULT);
 
         end
         else if (is_fetch_failed_i) begin
@@ -1009,7 +1017,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
             pc_set_o              = 1'b1;
             trap_addr_mux_o       = TRAP_MACHINE;
             exc_pc_mux_o          = debug_mode_q ? EXC_PC_DBE : EXC_PC_EXCEPTION;
-            exc_cause_o           = EXC_CAUSE_INSTR_FAULT;
+            exc_cause_o           = $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_INSTR_FAULT);
 
         end
         else begin
@@ -1185,7 +1193,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
         exc_pc_mux_o      = EXC_PC_DBD;
         csr_save_cause_o  = 1'b1;
         debug_csr_save_o  = 1'b1;
-        if (debug_force_wakeup_q) 
+        if (debug_force_wakeup_q)
             debug_cause_o = DBG_CAUSE_HALTREQ;
         else if (debug_single_step_i)
             debug_cause_o = DBG_CAUSE_STEP; // pri 0
@@ -1212,7 +1220,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
             csr_save_cause_o  = 1'b1;
             data_err_ack_o    = 1'b1;
             //no jump in this stage as we have to wait one cycle to go to Machine Mode
-            csr_cause_o       = {1'b0, data_we_ex_i ? EXC_CAUSE_STORE_FAULT : EXC_CAUSE_LOAD_FAULT};
+            csr_cause_o       = {1'b0, data_we_ex_i ? $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_STORE_FAULT) : $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_LOAD_FAULT)};
             ctrl_fsm_ns       = FLUSH_WB;
         end  //data error
         else begin
@@ -1446,7 +1454,7 @@ endgenerate
 
   assign debug_wfi_no_sleep_o = debug_mode_q || debug_req_pending || debug_single_step_i || trigger_match_i || PULP_CLUSTER;
 
-  // Gate off wfi 
+  // Gate off wfi
   assign wfi_active = wfi_i & ~debug_wfi_no_sleep_o;
 
   // sticky version of debug_req (must be on clk_ungated_i such that incoming pulse before core is enabled is not missed)
@@ -1566,7 +1574,7 @@ endgenerate
 
   // Ensure DBG_TAKEN_IF can only be enterred if in single step mode or woken
   // up from sleep by debug_req_i
-         
+
   a_single_step_dbg_taken_if : assert property (@(posedge clk)  disable iff (!rst_n)  (ctrl_fsm_ns==DBG_TAKEN_IF) |-> ((~debug_mode_q && debug_single_step_i) || debug_force_wakeup_n));
 
   // Ensure DBG_FLUSH state is only one cycle. This implies that cause is either trigger, debug_req_entry, or ebreak

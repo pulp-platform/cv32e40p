@@ -43,7 +43,9 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
   parameter APU_WOP_CPU       =  6,
   parameter APU_NDSFLAGS_CPU  = 15,
   parameter APU_NUSFLAGS_CPU  =  5,
-  parameter DEBUG_TRIGGER_EN  =  1
+  parameter DEBUG_TRIGGER_EN  =  1,
+  parameter CLIC              =  1,
+  parameter NUM_INTERRUPTS    = 32
 )
 (
     input  logic        clk,                    // Gated clock
@@ -156,7 +158,8 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     output csr_opcode_e csr_op_ex_o,
     input  PrivLvl_t    current_priv_lvl_i,
     output logic        csr_irq_sec_o,
-    output logic [5:0]  csr_cause_o,
+    output logic [$clog2(NUM_INTERRUPTS):0] csr_cause_o,
+    output logic [7:0]  csr_irq_level_o,
     output logic        csr_save_if_o,
     output logic        csr_save_id_o,
     output logic        csr_save_ex_o,
@@ -195,15 +198,18 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     output logic [5:0]  atop_ex_o,
 
     // Interrupt signals
-    input  logic [31:0] irq_i,
+    input  logic [NUM_INTERRUPTS-1:0] irq_i,
     input  logic        irq_sec_i,
+    input  logic [7:0]  irq_level_i,
     input  logic [31:0] mie_bypass_i,           // MIE CSR (bypass)
     output logic [31:0] mip_o,                  // MIP CSR
     input  logic        m_irq_enable_i,
     input  logic        u_irq_enable_i,
+    input  logic [7:0]  mintthresh_i,
+    input  Mintstatus_t mintstatus_i,
     output logic        irq_ack_o,
-    output logic [4:0]  irq_id_o,
-    output logic [4:0]  exc_cause_o,
+    output logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_o,
+    output logic [$clog2(NUM_INTERRUPTS)-1:0] exc_cause_o,
 
     // Debug Signal
     output logic        debug_mode_o,
@@ -327,7 +333,8 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
   logic       irq_req_ctrl;
   logic       irq_sec_ctrl;
   logic       irq_wu_ctrl;
-  logic [4:0] irq_id_ctrl;
+  logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_ctrl;
+  logic [7:0] irq_level_ctrl;
 
   // Register file interface
   logic [5:0]  regfile_addr_ra_id;
@@ -1089,8 +1096,9 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
 
   cv32e40p_controller
   #(
-    .PULP_CLUSTER ( PULP_CLUSTER ),
-    .PULP_XPULP   ( PULP_XPULP   )
+    .PULP_CLUSTER   ( PULP_CLUSTER   ),
+    .PULP_XPULP     ( PULP_XPULP     ),
+    .NUM_INTERRUPTS ( NUM_INTERRUPTS )
   )
   controller_i
   (
@@ -1178,6 +1186,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     .irq_req_ctrl_i                 ( irq_req_ctrl           ),
     .irq_sec_ctrl_i                 ( irq_sec_ctrl           ),
     .irq_id_ctrl_i                  ( irq_id_ctrl            ),
+    .irq_level_ctrl_i               ( irq_level_ctrl         ),
     .current_priv_lvl_i             ( current_priv_lvl_i     ),
     .irq_ack_o                      ( irq_ack_o              ),
     .irq_id_o                       ( irq_id_o               ),
@@ -1203,6 +1212,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     // CSR Controller Signals
     .csr_save_cause_o               ( csr_save_cause_o       ),
     .csr_cause_o                    ( csr_cause_o            ),
+    .csr_irq_level_o                ( csr_irq_level_o        ),
     .csr_save_if_o                  ( csr_save_if_o          ),
     .csr_save_id_o                  ( csr_save_id_o          ),
     .csr_save_ex_o                  ( csr_save_ex_o          ),
@@ -1271,32 +1281,103 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
 //                                                                    //
 ////////////////////////////////////////////////////////////////////////
 
-  cv32e40p_int_controller
-  #(
-    .PULP_SECURE(PULP_SECURE)
-   )
-  int_controller_i
-  (
-    .clk                  ( clk                ),
-    .rst_n                ( rst_n              ),
 
-    // External interrupt lines
-    .irq_i                ( irq_i              ),
-    .irq_sec_i            ( irq_sec_i          ),
+  if (CLIC && PULP_SECURE) begin: gen_pulp_secure
+    $fatal(1, "[cv32e40p] CLIC plus PULP_SECURE not implemented");
+  end
 
-    // To cv32e40p_controller
-    .irq_req_ctrl_o       ( irq_req_ctrl       ),
-    .irq_sec_ctrl_o       ( irq_sec_ctrl       ),
-    .irq_id_ctrl_o        ( irq_id_ctrl        ),
-    .irq_wu_ctrl_o        ( irq_wu_ctrl        ),
+  generate
+  if (CLIC) begin : gen_int_controller
 
-    // To/from with cv32e40p_cs_registers
-    .mie_bypass_i         ( mie_bypass_i       ),
-    .mip_o                ( mip_o              ),
-    .m_ie_i               ( m_irq_enable_i     ),
-    .u_ie_i               ( u_irq_enable_i     ),
-    .current_priv_lvl_i   ( current_priv_lvl_i )
-  );
+    logic [NUM_INTERRUPTS-1:0] irq_q;
+    logic        irq_sec_q;
+    logic [7:0]  irq_level;
+
+    // register all interrupt inputs
+    always_ff @(posedge clk, negedge rst_n) begin
+      if (rst_n == 1'b0) begin
+        irq_q     <= '0;
+        irq_sec_q <= 1'b0;
+        irq_level <= '0;
+      end else begin
+        irq_q     <= irq_i;
+        irq_sec_q <= irq_sec_i;
+        irq_level <= irq_level_i;
+      end
+    end
+
+    // In clic mode irq_i is one hot encoded (due to how clic is the only source
+    // requesting interrupts). Turn this back into an integer.
+    // TODO: probably better that we turn the irq_i signal back into an integer
+    // how it used to be for clic mode
+    localparam int unsigned IRQ_ID_WIDTH = $clog2(NUM_INTERRUPTS); //bin width
+
+    for (genvar j = 0; j < IRQ_ID_WIDTH; j++) begin : jl
+      logic [NUM_INTERRUPTS-1:0] tmp_mask;
+      for (genvar i = 0; i < NUM_INTERRUPTS; i++) begin : il
+        logic [IRQ_ID_WIDTH-1:0] tmp_i;
+        assign tmp_i = i;
+        assign tmp_mask[i] = tmp_i[j];
+      end
+      assign irq_id_ctrl[j] = |(tmp_mask & irq_q);
+    end
+    // pragma translate_off
+`ifndef VERILATOR
+    assert final ($onehot0(irq_q)) else
+      $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+`endif
+    // pragma translate_on
+
+    // Check if the interrupt level of the current interrupt exceeds the current
+    // irq threshold and global interrupt are enabled (otherwise it wont' fire).
+    // The effective interrupt threshold is the maximum of mintstatus.mil and
+    // mintthresh.
+    logic [7:0] max_thresh;
+
+    assign max_thresh = mintthresh_i > mintstatus_i.mil ? mintthresh_i : mintstatus_i.mil;
+    assign irq_req_ctrl = (irq_level > max_thresh) && (|irq_q) && m_irq_enable_i;
+    assign irq_level_ctrl = irq_level;
+
+    // tied to zero in CLIC mode
+    assign mip_o = '0;
+
+    assign irq_sec_ctrl = 1'b0;
+
+    // Wake-up signal based on unregistered IRQ such that wake-up can be caused if no clock is present
+    assign irq_wu_ctrl_o = |(irq_i & mie_bypass_i);
+
+  end else begin
+
+    cv32e40p_int_controller
+    #(
+      .PULP_SECURE(PULP_SECURE),
+      .NUM_INTERRUPTS(NUM_INTERRUPTS)
+     )
+    int_controller_i
+    (
+      .clk                  ( clk                ),
+      .rst_n                ( rst_n              ),
+
+      // External interrupt lines
+      .irq_i                ( irq_i              ),
+      .irq_sec_i            ( irq_sec_i          ),
+
+      // To cv32e40p_controller
+      .irq_req_ctrl_o       ( irq_req_ctrl       ),
+      .irq_sec_ctrl_o       ( irq_sec_ctrl       ),
+      .irq_id_ctrl_o        ( irq_id_ctrl        ),
+      .irq_wu_ctrl_o        ( irq_wu_ctrl        ),
+
+      // To/from with cv32e40p_cs_registers
+      .mie_bypass_i         ( mie_bypass_i       ),
+      .mip_o                ( mip_o              ),
+      .m_ie_i               ( m_irq_enable_i     ),
+      .u_ie_i               ( u_irq_enable_i     ),
+      .current_priv_lvl_i   ( current_priv_lvl_i )
+    );
+
+  end
+  endgenerate
 
   generate
   if (PULP_XPULP) begin : gen_hwloop_regs
