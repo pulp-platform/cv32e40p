@@ -847,7 +847,7 @@ module cv32e40p_cs_registers
               if (~is_irq) begin
                 //Exceptions, Ecall U --> M
                 priv_lvl_n     = PRIV_LVL_M;
-                mstatus_n.mpie = mstatus_q.uie;
+                mstatus_n.mpie = mstatus_q.mie;
                 mstatus_n.mie  = 1'b0;
                 mstatus_n.mpp  = PRIV_LVL_U;
                 if (debug_csr_save_i) depc_n = exception_pc;
@@ -867,7 +867,7 @@ module cv32e40p_cs_registers
                 end else begin
                   //U --> M
                   priv_lvl_n     = PRIV_LVL_M;
-                  mstatus_n.mpie = mstatus_q.uie;
+                  mstatus_n.mpie = mstatus_q.mie;
                   mstatus_n.mie  = 1'b0;
                   mstatus_n.mpp  = PRIV_LVL_U;
                   if (debug_csr_save_i) depc_n = exception_pc;
@@ -910,7 +910,7 @@ module cv32e40p_cs_registers
         csr_restore_mret_i: begin  //MRET
           unique case (mstatus_q.mpp)
             PRIV_LVL_U: begin
-              mstatus_n.uie  = mstatus_q.mpie;
+              mstatus_n.mie  = mstatus_q.mpie;
               priv_lvl_n     = PRIV_LVL_U;
               mstatus_n.mpie = 1'b1;
               mstatus_n.mpp  = PRIV_LVL_U;
