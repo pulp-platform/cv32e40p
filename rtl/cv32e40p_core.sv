@@ -35,7 +35,9 @@ module cv32e40p_core
     parameter PULP_CLUSTER = 0,  // PULP Cluster interface (incl. p.elw)
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
-    parameter NUM_MHPMCOUNTERS = 1
+    parameter CLIC = 0,  // Core Local Interrupt Controller
+    parameter NUM_MHPMCOUNTERS = 1,
+    parameter NUM_INTERRUPTS = 32
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -47,6 +49,7 @@ module cv32e40p_core
     // Core ID, Cluster ID, debug mode halt address and boot address are considered more or less static
     input logic [31:0] boot_addr_i,
     input logic [31:0] mtvec_addr_i,
+    input logic [31:0] mtvt_addr_i,
     input logic [31:0] dm_halt_addr_i,
     input logic [31:0] hart_id_i,
     input logic [31:0] dm_exception_addr_i,
@@ -82,9 +85,13 @@ module cv32e40p_core
     input  logic [APU_NUSFLAGS_CPU-1:0]       apu_flags_i,
 
     // Interrupt inputs
-    input  logic [31:0] irq_i,  // CLINT interrupts + CLINT extension interrupts
-    output logic        irq_ack_o,
-    output logic [ 4:0] irq_id_o,
+    input  logic [  NUM_INTERRUPTS-1:0]       irq_i,       // CLINT interrupts + CLINT extension interrupts
+    input  logic [                 7:0]       irq_level_i, // CLIC interrupt level
+    input  logic                              irq_shv_i,   // CLIC selective hardware vectoring
+    output logic                              irq_ack_o,
+    output logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_o,
+
+
 
     // Debug Interface
     input  logic debug_req_i,
@@ -112,6 +119,11 @@ module cv32e40p_core
   // to data_req_o
   localparam PULP_OBI = 0;
 
+  // CLIC SHV support (0 -> not implemented, 1 -> implemented). We don't expose
+  // this as a configurable parameter because you always want this if you use
+  // the CLIC.
+  localparam CLIC_SHV            = 1;
+
   // Unused signals related to above unused parameters
   // Left in code (with their original _i, _o postfixes) for future design extensions;
   // these used to be former inputs/outputs of RI5CY
@@ -137,9 +149,9 @@ module cv32e40p_core
 
   logic [ 3:0] pc_mux_id;  // Mux selector for next PC
   logic [ 2:0] exc_pc_mux_id;  // Mux selector for exception PC
-  logic [ 4:0] m_exc_vec_pc_mux_id;  // Mux selector for vectored IRQ PC
-  logic [ 4:0] u_exc_vec_pc_mux_id;  // Mux selector for vectored IRQ PC
-  logic [ 4:0] exc_cause;
+  logic [$clog2(NUM_INTERRUPTS)-1:0] m_exc_vec_pc_mux_id; // Mux selector for vectored IRQ PC
+  logic [$clog2(NUM_INTERRUPTS)-1:0] u_exc_vec_pc_mux_id; // Mux selector for vectored IRQ PC
+  logic [$clog2(NUM_INTERRUPTS)-1:0] exc_cause;
 
   logic [ 1:0] trap_addr_mux;
 
@@ -239,6 +251,7 @@ module cv32e40p_core
   logic                                     csr_access_ex;
   csr_opcode_e                              csr_op_ex;
   logic [23:0] mtvec, utvec;
+  logic [23:0] mtvt, utvt;
   logic        [ 1:0] mtvec_mode;
   logic        [ 1:0] utvec_mode;
 
@@ -287,16 +300,21 @@ module cv32e40p_core
   logic [31:0] mepc, uepc, depc;
   logic [             31:0]       mie_bypass;
   logic [             31:0]       mip;
+  logic [7:0]  mintthresh;
+  Mintstatus_t mintstatus;
+  logic        minhv;
 
   logic                           csr_save_cause;
   logic                           csr_save_if;
   logic                           csr_save_id;
   logic                           csr_save_ex;
-  logic [              5:0]       csr_cause;
+  logic [$clog2(NUM_INTERRUPTS):0]  csr_cause;
+  logic [7:0]  csr_irq_level;
   logic                           csr_restore_mret_id;
   logic                           csr_restore_uret_id;
   logic                           csr_restore_dret_id;
   logic                           csr_mtvec_init;
+  logic        csr_mtvt_init;
 
   // HPM related control signals
   logic [             31:0]       mcounteren;
@@ -357,8 +375,10 @@ module cv32e40p_core
   logic                           instr_err_pmp;
 
   // Mux selector for vectored IRQ PC
-  assign m_exc_vec_pc_mux_id = (mtvec_mode == 2'b0) ? 5'h0 : exc_cause;
-  assign u_exc_vec_pc_mux_id = (utvec_mode == 2'b0) ? 5'h0 : exc_cause;
+  assign m_exc_vec_pc_mux_id = ((!CLIC && mtvec_mode == 2'h1) || (CLIC && CLIC_SHV && irq_shv_i))
+    ? exc_cause : {($clog2(NUM_INTERRUPTS)){1'b0}}; //TODO CLIC==1 <=> mtvec_mode==2'b11, remove CLIC elab param
+  assign u_exc_vec_pc_mux_id = ((!CLIC && utvec_mode == 2'h1) || (CLIC && CLIC_SHV && irq_shv_i))
+    ? exc_cause : {($clog2(NUM_INTERRUPTS)){1'b0}};
 
   // PULP_SECURE == 0
   assign irq_sec_i = 1'b0;
@@ -424,7 +444,10 @@ module cv32e40p_core
       .PULP_XPULP (PULP_XPULP),
       .PULP_OBI   (PULP_OBI),
       .PULP_SECURE(PULP_SECURE),
-      .FPU        (FPU)
+      .FPU        (FPU),
+      .CLIC       (CLIC),
+      .CLIC_SHV   (CLIC_SHV),
+      .NUM_INTERRUPTS(NUM_INTERRUPTS)
   ) if_stage_i (
       .clk  (clk),
       .rst_n(rst_ni),
@@ -439,6 +462,13 @@ module cv32e40p_core
       // trap vector location
       .m_trap_base_addr_i(mtvec),
       .u_trap_base_addr_i(utvec),
+      .m_trap_base_addr_clic_shv_i(mtvt),
+      .u_trap_base_addr_clic_shv_i(utvt),
+
+      // selective hardware vectoring
+      .irq_shv_i(irq_shv_i),
+      .minhv_o  (minhv),
+
       .trap_addr_mux_i   (trap_addr_mux),
 
       // instruction request control
@@ -481,6 +511,7 @@ module cv32e40p_core
       .u_exc_vec_pc_mux_i(u_exc_vec_pc_mux_id),
 
       .csr_mtvec_init_o(csr_mtvec_init),
+      .csr_mtvt_init_o (csr_mtvt_init),
 
       // from hwloop registers
       .hwlp_jump_i  (hwlp_jump),
@@ -522,7 +553,9 @@ module cv32e40p_core
       .APU_WOP_CPU     (APU_WOP_CPU),
       .APU_NDSFLAGS_CPU(APU_NDSFLAGS_CPU),
       .APU_NUSFLAGS_CPU(APU_NUSFLAGS_CPU),
-      .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN)
+      .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN),
+      .CLIC            (CLIC),
+      .NUM_INTERRUPTS  (NUM_INTERRUPTS)
   ) id_stage_i (
       .clk          (clk),  // Gated clock
       .clk_ungated_i(clk_i),  // Ungated clock
@@ -636,6 +669,7 @@ module cv32e40p_core
       .current_priv_lvl_i   (current_priv_lvl),
       .csr_irq_sec_o        (csr_irq_sec),
       .csr_cause_o          (csr_cause),
+      .csr_irq_level_o      (csr_irq_level),
       .csr_save_if_o        (csr_save_if),  // control signal to save pc
       .csr_save_id_o        (csr_save_id),  // control signal to save pc
       .csr_save_ex_o        (csr_save_ex),  // control signal to save pc
@@ -678,10 +712,13 @@ module cv32e40p_core
       // Interrupt Signals
       .irq_i         (irq_i),
       .irq_sec_i     ((PULP_SECURE) ? irq_sec_i : 1'b0),
+      .irq_level_i   (irq_level_i),
       .mie_bypass_i  (mie_bypass),
       .mip_o         (mip),
       .m_irq_enable_i(m_irq_enable),
       .u_irq_enable_i(u_irq_enable),
+      .mintthresh_i  (mintthresh),
+      .mintstatus_i  (mintstatus),
       .irq_ack_o     (irq_ack_o),
       .irq_id_o      (irq_id_o),
 
@@ -940,7 +977,9 @@ module cv32e40p_core
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
       .PULP_XPULP      (PULP_XPULP),
       .PULP_CLUSTER    (PULP_CLUSTER),
-      .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN)
+      .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN),
+      .CLIC            (CLIC),
+      .NUM_INTERRUPTS  (NUM_INTERRUPTS)
   ) cs_registers_i (
       .clk  (clk),
       .rst_n(rst_ni),
@@ -948,12 +987,17 @@ module cv32e40p_core
       // Hart ID from outside
       .hart_id_i       (hart_id_i),
       .mtvec_o         (mtvec),
+      .mtvt_o          (mtvt),
       .utvec_o         (utvec),
+      .utvt_o          (utvt),
       .mtvec_mode_o    (mtvec_mode),
       .utvec_mode_o    (utvec_mode),
       // mtvec address
       .mtvec_addr_i    (mtvec_addr_i[31:0]),
       .csr_mtvec_init_i(csr_mtvec_init),
+      // mtvt address
+      .mtvt_addr_i     (mtvt_addr_i[31:0]),
+      .csr_mtvt_init_i (csr_mtvt_init),
       // Interface to CSRs (SRAM like)
       .csr_addr_i      (csr_addr),
       .csr_wdata_i     (csr_wdata),
@@ -969,10 +1013,15 @@ module cv32e40p_core
       .mip_i         (mip),
       .m_irq_enable_o(m_irq_enable),
       .u_irq_enable_o(u_irq_enable),
+      .mintthresh_o  (mintthresh),
+      .mintstatus_o  (mintstatus),
       .csr_irq_sec_i (csr_irq_sec),
       .sec_lvl_o     (sec_lvl_o),
       .mepc_o        (mepc),
       .uepc_o        (uepc),
+
+      // Interrupts Selective Hardware Vectoring
+      .minhv_i       (minhv),
 
       // HPM related control signals
       .mcounteren_o(mcounteren),
@@ -1005,6 +1054,7 @@ module cv32e40p_core
       .csr_restore_dret_i(csr_restore_dret_id),
 
       .csr_cause_i     (csr_cause),
+      .csr_irq_level_i (csr_irq_level),
       .csr_save_cause_i(csr_save_cause),
 
       // from hwloop registers
@@ -1164,7 +1214,9 @@ module cv32e40p_core
       // Check that a taken IRQ was for an enabled cause and that mstatus.mie gets disabled
       property p_irq_enabled_1;
         @(posedge clk) disable iff (!rst_ni) (pc_set && (pc_mux_id == PC_EXCEPTION) && (exc_pc_mux_id == EXC_PC_IRQ)) |=>
-         (cs_registers_i.mcause_q[5] && cs_registers_i.mie_q[cs_registers_i.mcause_q[4:0]] && !cs_registers_i.mstatus_q.mie);
+         (cs_registers_i.mcause_q[$clog2(NUM_INTERRUPTS)] &&
+          cs_registers_i.mie_q[cs_registers_i.mcause_q[$clog2(NUM_INTERRUPTS)-1:0]] &&
+          !cs_registers_i.mstatus_q.mie);
       endproperty
 
       a_irq_enabled_1 :
@@ -1227,19 +1279,19 @@ module cv32e40p_core
           actual_ebrk_mepc          <= 32'b0;
         end else begin
           if (!first_cause_illegal_found && (cs_registers_i.csr_cause_i == {
-                1'b0, EXC_CAUSE_ILLEGAL_INSN
+                1'b0, $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_ILLEGAL_INSN)
               }) && csr_save_cause) begin
             first_cause_illegal_found <= 1'b1;
             actual_illegal_mepc       <= cs_registers_i.mepc_n;
           end
           if (!first_cause_ecall_found && (cs_registers_i.csr_cause_i == {
-                1'b0, EXC_CAUSE_ECALL_MMODE
+                1'b0, $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_ECALL_MMODE)
               }) && csr_save_cause) begin
             first_cause_ecall_found <= 1'b1;
             actual_ecall_mepc       <= cs_registers_i.mepc_n;
           end
           if (!first_cause_ebrk_found && (cs_registers_i.csr_cause_i == {
-                1'b0, EXC_CAUSE_BREAKPOINT
+                1'b0, $clog2(NUM_INTERRUPTS)'(EXC_CAUSE_BREAKPOINT)
               }) && csr_save_cause) begin
             first_cause_ebrk_found <= 1'b1;
             actual_ebrk_mepc       <= cs_registers_i.mepc_n;

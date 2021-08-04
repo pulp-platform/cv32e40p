@@ -32,7 +32,9 @@ module cv32e40p_wrapper
     parameter PULP_CLUSTER = 0,  // PULP Cluster interface (incl. p.elw)
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
-    parameter NUM_MHPMCOUNTERS = 1
+    parameter NUM_MHPMCOUNTERS = 1,
+    parameter NUM_INTERRUPTS = 32,  // Number of interrupt lines
+    parameter CLIC = 0  // Whether we use the Core-local interrupt controller
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -44,6 +46,7 @@ module cv32e40p_wrapper
     // Core ID, Cluster ID, debug mode halt address and boot address are considered more or less static
     input logic [31:0] boot_addr_i,
     input logic [31:0] mtvec_addr_i,
+    input logic [31:0] mtvt_addr_i,
     input logic [31:0] dm_halt_addr_i,
     input logic [31:0] hart_id_i,
     input logic [31:0] dm_exception_addr_i,
@@ -79,9 +82,11 @@ module cv32e40p_wrapper
     input  logic [APU_NUSFLAGS_CPU-1:0]       apu_flags_i,
 
     // Interrupt inputs
-    input  logic [31:0] irq_i,  // CLINT interrupts + CLINT extension interrupts
+    input  logic [NUM_INTERRUPTS-1:0] irq_i,        // CLINT interrupts + CLINT extension interrupts
+    input  logic [7:0]                irq_level_i,  // CLIC interrupt level
+    input  logic                      irq_shv_i,    // CLIC selective hardware vectoring
     output logic        irq_ack_o,
-    output logic [ 4:0] irq_id_o,
+    output logic [$clog2(NUM_INTERRUPTS)-1:0]  irq_id_o,
 
     // Debug Interface
     input  logic debug_req_i,
@@ -114,7 +119,8 @@ module cv32e40p_wrapper
       .PULP_CLUSTER    (PULP_CLUSTER),
       .FPU             (FPU),
       .PULP_ZFINX      (PULP_ZFINX),
-      .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS)
+      .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
+      .NUM_INTERRUPTS  (NUM_INTERRUPTS)
   ) core_log_i (
       .clk_i             (core_i.id_stage_i.clk),
       .is_decoding_i     (core_i.id_stage_i.is_decoding_o),
@@ -204,7 +210,9 @@ module cv32e40p_wrapper
       .PULP_CLUSTER    (PULP_CLUSTER),
       .FPU             (FPU),
       .PULP_ZFINX      (PULP_ZFINX),
-      .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS)
+      .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
+      .NUM_INTERRUPTS  (NUM_INTERRUPTS),
+      .CLIC            (CLIC)
   ) core_i (
       .*
   );
