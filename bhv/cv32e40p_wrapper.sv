@@ -76,6 +76,7 @@ module cv32e40p_wrapper
     // request channel
     output logic [   APU_NARGS_CPU-1:0][31:0] apu_operands_o,
     output logic [     APU_WOP_CPU-1:0]       apu_op_o,
+    output logic [                 2:0]       apu_type_o,
     output logic [APU_NDSFLAGS_CPU-1:0]       apu_flags_o,
     // response channel
     input  logic                              apu_rvalid_i,
