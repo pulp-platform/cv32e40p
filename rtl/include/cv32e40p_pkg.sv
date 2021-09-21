@@ -731,4 +731,16 @@ parameter C_FLEN = C_RVD     ? 64 : // D ext.
 parameter C_FFLAG             = 5;
 parameter C_RM                = 3;
 
+// types of the APU offloading interface
+
+// Signal the external FPU system the type of operation. Needed if some
+// resources (e.g. DIVSQRT) are decoupled from the other FP operations
+parameter int unsigned APUTYPE_FP         = 0;
+parameter int unsigned APUTYPE_ADDSUB     = 1;
+parameter int unsigned APUTYPE_MULT       = 2;
+parameter int unsigned APUTYPE_CAST       = 3;
+parameter int unsigned APUTYPE_MAC        = 4;
+parameter int unsigned APUTYPE_DIV        = 5;
+parameter int unsigned APUTYPE_SQRT       = 6;
+
 endpackage
