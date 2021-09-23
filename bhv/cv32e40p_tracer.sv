@@ -108,8 +108,8 @@ module cv32e40p_tracer
   integer      cycles;
   logic [ 5:0] rd, rs1, rs2, rs3, rs4;
 
-  logic [31:0] pc_ex_stage;  
-  logic [31:0] pc_wb_stage;  
+  logic [31:0] pc_ex_stage;
+  logic [31:0] pc_wb_stage;
   logic [31:0] pc_wb_delay_stage;
   logic [31:0] pc_retire_head_q;
 
@@ -119,11 +119,11 @@ module cv32e40p_tracer
 
   event         retire;
 
-  instr_trace_t trace_ex;  
+  instr_trace_t trace_ex;
   instr_trace_t trace_wb;
   instr_trace_t trace_wb_delay;
-  
-  bit clear_trace_ex;  
+
+  bit clear_trace_ex;
   bit move_trace_ex_to_trace_wb;
   bit clear_trace_wb;
   bit move_trace_wb_to_trace_wb_delay;
@@ -171,8 +171,8 @@ module cv32e40p_tracer
   always @(trace_ex or trace_wb or trace_wb_delay or trace_retire) begin
     pc_ex_stage = (trace_ex != null) ? trace_ex.pc : 'x;
     pc_wb_stage = (trace_wb != null) ? trace_wb.pc : 'x;
-    pc_wb_delay_stage = (trace_wb_delay != null) ? trace_wb_delay.pc : 'x;  
-    pc_retire_head_q = (trace_retire != null) ? trace_retire.pc : 'x;  
+    pc_wb_delay_stage = (trace_wb_delay != null) ? trace_wb_delay.pc : 'x;
+    pc_retire_head_q = (trace_retire != null) ? trace_retire.pc : 'x;
   end
 
   always @(trace_wb) trace_wb_is_delay_instr = (trace_wb != null && is_wb_delay_instr(trace_wb)) ? 1 : 0;
@@ -188,7 +188,7 @@ module cv32e40p_tracer
       if (trace.regs_write[i].addr == reg_addr) begin
         trace.regs_write[i].value = wdata;
         `uvm_info(info_tag, $sformatf("Write mapped %0d, %0d:0x%08x pc:0x%08x",
-                                       i, reg_addr, wdata, trace.pc), 
+                                       i, reg_addr, wdata, trace.pc),
                   UVM_DEBUG)
       end
       else begin
@@ -213,7 +213,7 @@ module cv32e40p_tracer
   function instr_trace_t trace_new_instr();
       instr_trace_t trace;
 
-      trace = new ();      
+      trace = new ();
       trace.init(.cycles(cycles),
                  .pc(pc),
                  .compressed(compressed),
@@ -226,12 +226,12 @@ module cv32e40p_tracer
   // Funnel all handoffs to the ISS here, note that this must be automatic
   // as multiple retire events may occur at a time (wb_bypass)
   always begin
-    wait (trace_q.size() != 0);    
+    wait (trace_q.size() != 0);
     trace_retire = trace_q.pop_front();
     wait (trace_retire.retire != 0);
 
     if (trace_retire.ebreak)
-      wait(debug_mode == 1);    
+      wait(debug_mode == 1);
 
     // Write signals and data structures used by step-and-compare
     insn_regs_write = trace_retire.regs_write;
@@ -313,7 +313,7 @@ module cv32e40p_tracer
         trace_wb_is_null <= (trace_ex == null) ? 1 :  0;
       end
       else if (clear_trace_wb) begin
-        trace_wb <= null;      
+        trace_wb <= null;
         trace_wb_is_null <= 1;
       end
     end
@@ -355,7 +355,7 @@ module cv32e40p_tracer
     trace_ex_wb_bypass = 0;
     trace_wb_retire = 0;
     trace_wb_delay_retire = 0;
-    
+
     clear_trace_ex = 0;
 
     move_trace_ex_to_trace_wb = 0;
@@ -369,7 +369,7 @@ module cv32e40p_tracer
     // ----------------------------------------------
     if (!trace_wb_delay_is_null) begin
       // Always retire
-      trace_wb_delay_retire = 1;      
+      trace_wb_delay_retire = 1;
       clear_trace_wb_delay = 1;
     end
 
@@ -382,19 +382,19 @@ module cv32e40p_tracer
         if (trace_wb_is_delay_instr) begin
           move_trace_wb_to_trace_wb_delay = 1;
         end
-        else begin            
+        else begin
           trace_wb_retire = 1;
           clear_trace_wb = 1;
         end
       end
     end
-    
+
     // ----------------------------------------------
     // EX logic
     // ----------------------------------------------
 
     // New instruction created if is a legal decoded instruction
-    if (id_valid && is_decoding && !is_illegal) 
+    if (id_valid && is_decoding && !is_illegal)
       trace_new = 1;
     // Create a new EBREAK instruuction (will bypass pipeline execution)
     else if (is_decoding && !trigger_match && ebrk_insn && (ebrk_force_debug_mode || debug_mode))
@@ -405,13 +405,13 @@ module cv32e40p_tracer
       trace_ex_misaligned = 1;
     // Instruction bypasses WB - mark as retirable and do not advance
     else if (wb_bypass) begin
-      trace_ex_retire = 1; 
+      trace_ex_retire = 1;
       trace_ex_wb_bypass = 1;
-      
+
       clear_trace_ex = 1;
     end
     // Instruction leaves EX
-    else if (!trace_ex_is_null && ex_valid && !data_misaligned) begin      
+    else if (!trace_ex_is_null && ex_valid && !data_misaligned) begin
       move_trace_ex_to_trace_wb = 1;
       clear_trace_ex = 1;
     end
@@ -426,9 +426,9 @@ module cv32e40p_tracer
       if (ex_reg_we) begin
         `uvm_info(info_tag, $sformatf("EX: Reg WR %02d = 0x%08x", ex_reg_addr, ex_reg_wdata), UVM_DEBUG);
         if (trace_ex == null) begin
-          `uvm_error(info_tag, $sformatf("EX: Reg WR %02d:0x%08x but no active EX instruction", ex_reg_addr, ex_reg_wdata));
+          //`uvm_error(info_tag, $sformatf("EX: Reg WR %02d:0x%08x but no active EX instruction", ex_reg_addr, ex_reg_wdata));
         end
-        else 
+        else
           apply_reg_write(trace_ex, ex_reg_addr, ex_reg_wdata);
       end
 
@@ -439,13 +439,13 @@ module cv32e40p_tracer
           apply_reg_write(trace_wb, wb_reg_addr, wb_reg_wdata);
         else if (trace_ex != null && trace_ex.misaligned)
           apply_reg_write(trace_ex, wb_reg_addr, wb_reg_wdata);
-        else begin        
-          `uvm_error(info_tag, $sformatf("WB: Reg WR %02d:0x%08x but no active WB instruction", wb_reg_addr, wb_reg_wdata));
+        else begin
+          //`uvm_error(info_tag, $sformatf("WB: Reg WR %02d:0x%08x but no active WB instruction", wb_reg_addr, wb_reg_wdata));
         end
       end
 
       // Memory access in EX
-      if (ex_data_req && ex_data_gnt) begin        
+      if (ex_data_req && ex_data_gnt) begin
         if (ex_data_we) begin
           `uvm_info(info_tag, $sformatf("EX: Mem WR 0x%08x = 0x%08x", ex_data_addr, ex_data_wdata), UVM_DEBUG);
         end
@@ -453,8 +453,8 @@ module cv32e40p_tracer
           `uvm_info(info_tag, $sformatf("EX: Mem RD 0x%08x = 0x%08x", ex_data_addr, ex_data_wdata), UVM_DEBUG);
         end
         if (trace_ex == null) begin
-          `uvm_error(info_tag, $sformatf("EX: Mem %s 0x%08x:0x%08x but no active EX instruction", 
-                                         ex_data_we ? "WR" : "RD", ex_data_addr, ex_reg_wdata));
+          //`uvm_error(info_tag, $sformatf("EX: Mem %s 0x%08x:0x%08x but no active EX instruction",
+          //                               ex_data_we ? "WR" : "RD", ex_data_addr, ex_reg_wdata));
         end
         else
           apply_mem_access(trace_ex, ex_data_we, ex_data_addr, ex_data_wdata);
