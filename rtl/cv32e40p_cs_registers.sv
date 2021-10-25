@@ -497,7 +497,12 @@ if(PULP_SECURE==1) begin : gen_pulp_secure_read_logic
       CSR_HPMCOUNTER20H, CSR_HPMCOUNTER21H, CSR_HPMCOUNTER22H, CSR_HPMCOUNTER23H,
       CSR_HPMCOUNTER24H, CSR_HPMCOUNTER25H, CSR_HPMCOUNTER26H, CSR_HPMCOUNTER27H,
       CSR_HPMCOUNTER28H, CSR_HPMCOUNTER29H, CSR_HPMCOUNTER30H, CSR_HPMCOUNTER31H:
-        csr_rdata_int = mhpmcounter_q[csr_addr_i[4:0]][63:32];
+          if (MHPMCOUNTER_WIDTH == 64) begin: gen_hw_perf_monit_64
+            csr_rdata_int = mhpmcounter_q[csr_addr_i[4:0]][MHPMCOUNTER_WIDTH-1:MHPMCOUNTER_WIDTH-32];
+          end
+          else begin: gen_hw_perf_monit_32
+            csr_rdata_int = '0;
+          end
 
       CSR_MCOUNTINHIBIT: csr_rdata_int = mcountinhibit_q;
 
@@ -714,7 +719,12 @@ end else begin : gen_no_pulp_secure_read_logic // PULP_SECURE == 0
       CSR_HPMCOUNTER20H, CSR_HPMCOUNTER21H, CSR_HPMCOUNTER22H, CSR_HPMCOUNTER23H,
       CSR_HPMCOUNTER24H, CSR_HPMCOUNTER25H, CSR_HPMCOUNTER26H, CSR_HPMCOUNTER27H,
       CSR_HPMCOUNTER28H, CSR_HPMCOUNTER29H, CSR_HPMCOUNTER30H, CSR_HPMCOUNTER31H:
-        csr_rdata_int = (MHPMCOUNTER_WIDTH == 64) ? mhpmcounter_q[csr_addr_i[4:0]][63:32] : '0;
+          if (MHPMCOUNTER_WIDTH == 64) begin: gen_hw_perf_monit_64
+            csr_rdata_int = mhpmcounter_q[csr_addr_i[4:0]][MHPMCOUNTER_WIDTH-1:MHPMCOUNTER_WIDTH-32];
+          end
+          else begin: gen_hw_perf_monit_32
+            csr_rdata_int = '0;
+          end
 
       CSR_MCOUNTINHIBIT: csr_rdata_int = mcountinhibit_q;
 
@@ -1717,7 +1727,7 @@ end //PULP_SECURE = 0
         assign mhpmcounter_q[cnt_gidx] = 'b0;
       end
       else begin : gen_implemented
-        always_ff @(posedge clk, negedge rst_n)
+        always_ff @(posedge clk, negedge rst_n) begin
           if (!rst_n) begin
             mhpmcounter_q[cnt_gidx] <= 'b0;
           end else begin
@@ -1726,15 +1736,24 @@ end //PULP_SECURE = 0
             end else begin
               if (mhpmcounter_write_lower[cnt_gidx]) begin
                 mhpmcounter_q[cnt_gidx][31:0] <= csr_wdata_int;
-              end else if (mhpmcounter_write_upper[cnt_gidx] && MHPMCOUNTER_WIDTH == 64) begin
-                mhpmcounter_q[cnt_gidx][63:32] <= csr_wdata_int;
-              end else if (mhpmcounter_write_increment[cnt_gidx]) begin
-                mhpmcounter_q[cnt_gidx] <= mhpmcounter_increment[cnt_gidx];
-              end
-            end
-          end
-      end
-    end
+              end else begin
+                if (MHPMCOUNTER_WIDTH == 64) begin: gen_mph_cnt_csr_wdata_64
+                   if (mhpmcounter_write_upper[cnt_gidx]) begin
+                     mhpmcounter_q[cnt_gidx][MHPMCOUNTER_WIDTH-1:MHPMCOUNTER_WIDTH-32] <= csr_wdata_int;
+                   end else if (mhpmcounter_write_increment[cnt_gidx]) begin
+                     mhpmcounter_q[cnt_gidx] <= mhpmcounter_increment[cnt_gidx];
+                   end
+                end else begin: gen_mph_cnt_csr_wdata_32
+                  if (mhpmcounter_write_increment[cnt_gidx]) begin
+                    mhpmcounter_q[cnt_gidx] <= mhpmcounter_increment[cnt_gidx];
+                  end
+                end
+              end // else: !if(mhpmcounter_write_lower[cnt_gidx])
+            end // else: !if(PULP_PERF_COUNTERS && (cnt_gidx == 2 || cnt_gidx == 0))
+          end // else: !if(!rst_n)
+        end // always_ff @ (posedge clk, negedge rst_n)
+      end // block: gen_implemented
+    end // block: gen_mhpmcounter
   endgenerate
 
   //  Event Register: mhpevent_q[]
