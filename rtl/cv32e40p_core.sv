@@ -34,9 +34,9 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   parameter PULP_CLUSTER        =  0,                   // PULP Cluster interface (incl. p.elw)
   parameter FPU                 =  0,                   // Floating Point Unit (interfaced via APU interface)
   parameter PULP_ZFINX          =  0,                   // Float-in-General Purpose registers
-  parameter CLIC                =  1,                   // Core Local Interrupt Controller
+  parameter CLIC                =  0,                   // Core Local Interrupt Controller
   parameter NUM_MHPMCOUNTERS    =  1,
-  parameter NUM_INTERRUPTS  =  32
+  parameter NUM_INTERRUPTS      =  32
 )
 (
   // Clock and Reset
