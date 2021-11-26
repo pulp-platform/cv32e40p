@@ -1344,7 +1344,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     assign irq_sec_ctrl = 1'b0;
 
     // Wake-up signal based on unregistered IRQ such that wake-up can be caused if no clock is present
-    assign irq_wu_ctrl_o = |(irq_i & mie_bypass_i);
+    assign irq_wu_ctrl = |(irq_i);
 
   end else begin
 
