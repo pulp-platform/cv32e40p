@@ -304,6 +304,7 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   logic [31:0] mip;
   logic [7:0]  mintthresh;
   Mintstatus_t mintstatus;
+  logic        minhv;
 
   logic        csr_save_cause;
   logic        csr_save_if;
