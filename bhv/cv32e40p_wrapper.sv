@@ -214,7 +214,8 @@ module cv32e40p_wrapper import cv32e40p_apu_core_pkg::*;
           .FPU                   ( FPU                   ),
           .PULP_ZFINX            ( PULP_ZFINX            ),
           .NUM_MHPMCOUNTERS      ( NUM_MHPMCOUNTERS      ),
-          .NUM_INTERRUPTS        ( NUM_INTERRUPTS        ))
+          .NUM_INTERRUPTS        ( NUM_INTERRUPTS        ),
+          .CLIC                  ( CLIC                  ))
     core_i (.*);
 
 endmodule
