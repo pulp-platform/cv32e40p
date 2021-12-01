@@ -335,6 +335,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
   logic       irq_wu_ctrl;
   logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_ctrl;
   logic [7:0] irq_level_ctrl;
+  logic [4:0] irq_id_clint;
 
   // Register file interface
   logic [5:0]  regfile_addr_ra_id;
@@ -1350,8 +1351,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
 
     cv32e40p_int_controller
     #(
-      .PULP_SECURE(PULP_SECURE),
-      .NUM_INTERRUPTS(NUM_INTERRUPTS)
+      .PULP_SECURE(PULP_SECURE)
      )
     int_controller_i
     (
@@ -1359,13 +1359,13 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
       .rst_n                ( rst_n              ),
 
       // External interrupt lines
-      .irq_i                ( irq_i              ),
+      .irq_i                ( irq_i[31:0]        ),
       .irq_sec_i            ( irq_sec_i          ),
 
       // To cv32e40p_controller
       .irq_req_ctrl_o       ( irq_req_ctrl       ),
       .irq_sec_ctrl_o       ( irq_sec_ctrl       ),
-      .irq_id_ctrl_o        ( irq_id_ctrl        ),
+      .irq_id_ctrl_o        ( irq_id_clint       ),
       .irq_wu_ctrl_o        ( irq_wu_ctrl        ),
 
       // To/from with cv32e40p_cs_registers
@@ -1375,6 +1375,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
       .u_ie_i               ( u_irq_enable_i     ),
       .current_priv_lvl_i   ( current_priv_lvl_i )
     );
+    assign irq_id_ctrl[4:0] = irq_id_clint;
 
   end
   endgenerate

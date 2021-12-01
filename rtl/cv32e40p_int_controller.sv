@@ -23,15 +23,14 @@
 
 module cv32e40p_int_controller import cv32e40p_pkg::*;
 #(
-  parameter PULP_SECURE    = 0,
-  parameter NUM_INTERRUPTS = 32
+  parameter PULP_SECURE    = 0
 )
 (
   input  logic        clk,
   input  logic        rst_n,
 
   // External interrupt lines
-  input  logic [NUM_INTERRUPTS-1:0] irq_i,                    // Level-triggered interrupt inputs
+  input  logic [31:0] irq_i,                    // Level-triggered interrupt inputs
   input  logic        irq_sec_i,                // Interrupt secure bit from EU
 
   // To cv32e40p_controller
