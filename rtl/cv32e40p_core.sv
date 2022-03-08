@@ -973,7 +973,7 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   );
 
   // Tracer signal
-  assign wb_valid = lsu_ready_wb & apu_ready_wb;
+  assign wb_valid = lsu_ready_wb;
 
 
   //////////////////////////////////////
