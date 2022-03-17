@@ -44,6 +44,7 @@ module cv32e40p_cs_registers
     parameter PULP_CLUSTER     = 0,
     parameter DEBUG_TRIGGER_EN = 1,
     parameter CLIC             = 0,
+    parameter MCLICBASE_ADDR   = 32'h1A200000,
     parameter NUM_INTERRUPTS   = 32
 ) (
     // Clock and Reset
@@ -392,6 +393,8 @@ module cv32e40p_cs_registers
 //          csr_rdata_int = mscratch_q;    // rd = mscratch
 //        else
 //          csr_rdata_int = csr_wdata_int; // rd = rs1
+        // mclicbase: base address for CLIC memory mapped registers
+        CSR_MCLICBASE: csr_rdata_int = MCLICBASE_ADDR;
         // mepc: exception program counter
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
@@ -588,6 +591,8 @@ module cv32e40p_cs_registers
 //          csr_rdata_int = mscratch_q;    // rd = mscratch
 //        else
 //          csr_rdata_int = csr_wdata_int; // rd = rs1
+        // mclicbase: base address for CLIC memory mapped registers
+        CSR_MCLICBASE: csr_rdata_int = MCLICBASE_ADDR;
         // mepc: exception program counter
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
