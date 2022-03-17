@@ -2401,7 +2401,8 @@ module cv32e40p_decoder import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*;
             CSR_MVENDORID,
               CSR_MARCHID,
               CSR_MIMPID,
-              CSR_MHARTID :
+              CSR_MHARTID,
+              CSR_MCLICBASE :
                 if(csr_op != CSR_OP_READ) csr_illegal = 1'b1;
 
             // These are valid CSR registers
