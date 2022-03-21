@@ -1,5 +1,5 @@
 package:
-  name: riscv
+  name: cv32e40p
 
 dependencies:
   tech_cells_generic: { git: "https://github.com/pulp-platform/tech_cells_generic.git", version: 0.2.3 }
