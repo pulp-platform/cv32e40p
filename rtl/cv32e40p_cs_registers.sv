@@ -44,6 +44,7 @@ module cv32e40p_cs_registers
     parameter PULP_CLUSTER     = 0,
     parameter DEBUG_TRIGGER_EN = 1,
     parameter CLIC             = 0,
+    parameter CLIC_SHV         = 1,  // set default to 1, used for mnxti csr operation
     parameter MCLICBASE_ADDR   = 32'h1A200000,
     parameter SHADOW           = 0,
     parameter NUM_INTERRUPTS   = 32
@@ -84,6 +85,14 @@ module cv32e40p_cs_registers
     output logic        u_irq_enable_o,
     output logic [7:0]  mintthresh_o,
     output Mintstatus_t mintstatus_o,
+
+    input  logic [7:0]  irq_level_i,                            // instant pending interrupt level for mnxti csr
+    input  logic        irq_shv_i,                              // instant pending interrupt selective hardware vectoring for mnxti csr
+    input  logic [NUM_INTERRUPTS-1:0]         irq_i,            // instant pending interrupt for mmnxti csr
+    input  logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_instant_i, // instant pending interrupt id for mnxti csr (calculated in id_stage.sv)
+    output logic        irq_ack_mnxti_o,                        // give a pulse signal when mnxti csr take an interrupt
+    output logic        jalmnxti_ctrl_o,
+    output logic [31:0] jalmnxti_pc_o,
 
     //csr_irq_sec_i is always 0 if PULP_SECURE is zero
     input  logic        csr_irq_sec_i,
@@ -345,6 +354,25 @@ module cv32e40p_cs_registers
 
   assign mie_bypass_o = ((csr_addr_i == CSR_MIE) && csr_mie_we) ? csr_mie_wdata & IRQ_MASK : mie_q;
 
+// "MNXTI CSR" PREPARATION PART
+// define the variable used by mnxti csr
+logic [7:0]                        irq_level_n, irq_level_q;
+logic                              irq_shv_n, irq_shv_q;
+logic [NUM_INTERRUPTS-1:0]         irq_n, irq_q;
+logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_instant_n, irq_id_instant_q;
+logic                              irq_ack_mnxti_n, irq_ack_mnxti_q;
+
+assign irq_level_n      = irq_level_i;
+assign irq_shv_n        = irq_shv_i;
+assign irq_n            = irq_i;
+assign irq_id_instant_n  = irq_id_instant_i;
+assign irq_ack_mnxti_o  = irq_ack_mnxti_q;
+
+// conditions that should be met for mnxti csr operation
+logic mnxti_pass;
+assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ? mpil_q : mintthresh_q)) && ((~CLIC_SHV) || (~irq_shv_q));
+
+
   ////////////////////////////////////////////
   //   ____ ____  ____    ____              //
   //  / ___/ ___||  _ \  |  _ \ ___  __ _   //
@@ -417,6 +445,35 @@ module cv32e40p_cs_registers
         // mclicbase: base address for CLIC memory mapped registers
         CSR_MCLICBASE: csr_rdata_int = MCLICBASE_ADDR;
         // mepc: exception program counter
+        CSR_MNXTI: begin
+          if (mnxti_pass) begin
+            // caculate the corresponding vector table entry address
+            csr_rdata_int[31:8] = mtvt_q;
+            csr_rdata_int[ 7:2] = irq_id_instant_q;
+            csr_rdata_int[ 1:0] = '0; // XLEN is fixed to 32, so XLEN/8 = 4
+          end else begin
+            // to check if irq_q is onehot signal
+            `ifndef VERILATOR
+              assert final ($onehot0(irq_q)) else
+              $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+            `endif
+            csr_rdata_int = '0;
+          end
+        end
+        // jalmnxti: jump and link version of mnxti CSR
+        CSR_JALMNXTI: begin
+          if (mnxti_pass) begin
+            // caculate the corresponding vector table entry address
+            csr_rdata_int = exception_pc; // read_data is the current pc value for ra (return address)
+          end else begin
+            // to check if irq_q is onehot signal
+            `ifndef VERILATOR
+              assert final ($onehot0(irq_q)) else
+              $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+            `endif
+            csr_rdata_int = '0;
+          end
+        end
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
         CSR_MCAUSE:
@@ -614,6 +671,36 @@ module cv32e40p_cs_registers
 //          csr_rdata_int = csr_wdata_int; // rd = rs1
         // mclicbase: base address for CLIC memory mapped registers
         CSR_MCLICBASE: csr_rdata_int = MCLICBASE_ADDR;
+        // mnxti: next intertupt handler address and interrupt-enable CSR
+        CSR_MNXTI: begin
+          if (mnxti_pass) begin
+            // caculate the corresponding vector table entry address
+            csr_rdata_int[31:8] = mtvt_q;
+            csr_rdata_int[ 7:2] = irq_id_instant_q;
+            csr_rdata_int[ 1:0] = '0; // XLEN is fixed to 32, so XLEN/8 = 4
+          end else begin
+            // to check if irq_q is onehot signal
+            `ifndef VERILATOR
+              assert final ($onehot0(irq_q)) else
+              $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+            `endif
+            csr_rdata_int = '0;
+          end
+        end
+        // jalmnxti: jump and link version of mnxti CSR
+        CSR_JALMNXTI: begin
+          if (mnxti_pass) begin
+            // caculate the corresponding vector table entry address
+            csr_rdata_int = exception_pc; // read_data is the current pc value for ra (return address)
+          end else begin
+            // to check if irq_q is onehot signal
+            `ifndef VERILATOR
+              assert final ($onehot0(irq_q)) else
+              $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+            `endif
+            csr_rdata_int = '0;
+          end
+        end
         // mepc: exception program counter
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
@@ -780,6 +867,9 @@ module cv32e40p_cs_registers
       mpil_n                  = mpil_q;
       minhv_n                 = minhv_q;
 
+      irq_ack_mnxti_n         = '0; // to ensure that irq_ack_mnxti_o is a pulse
+      jalmnxti_ctrl_o         = '0;
+      jalmnxti_pc_o           = '0;
 
       if (FPU == 1) if (fflags_we_i) fflags_n = fflags_i | fflags_q;
 
@@ -834,10 +924,55 @@ module cv32e40p_cs_registers
 //      CSR_MSCRATCHCSWL:
 //        if ((csr_we_int) && ((mpil_q == 0) != (mintstatus_q.mil == 0)))
 //          mscratch_n = csr_wdata_int;
+        // mnxti: next intertupt handler address and interrupt-enable CSR
+        CSR_MNXTI: begin
+          if (csr_we_int) begin
+            mstatus_n.mie = mstatus_q.mie | csr_wdata_int[3]; //enable interrupt regardless of the conditions
+            if (mnxti_pass) begin
+              // update mil, excode and set ack signal if the conditions are met
+              mintstatus_n.mil                     = irq_level_q;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = irq_id_instant_q;
+              irq_ack_mnxti_n                      = 1'b1;
+            end else begin
+              // to check if irq_i is onehot
+              `ifndef VERILATOR
+                assert final ($onehot0(irq_q)) else
+                $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+              `endif
+              // mil, excode remain their original value when the conditions are not met
+              mintstatus_n.mil = mintstatus_q.mil;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
+            end
+          end
+        end
+        // jalmnxti: jump and link version of mnxti CSR
+        CSR_JALMNXTI: begin
+          if (csr_we_int) begin
+            mstatus_n.mie = mstatus_q.mie | csr_wdata_int[3]; //enable interrupt regardless of the conditions
+            if (mnxti_pass) begin
+              // update mil, excode and set ack signal if the conditions are met
+              mintstatus_n.mil                     = irq_level_q;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = irq_id_instant_q;
+              irq_ack_mnxti_n                      = 1'b1;
+              jalmnxti_ctrl_o                      = 1'b1;             // set the jump req signal
+              jalmnxti_pc_o[31:8]                  = mtvt_q;           // output the base address part of the jump target address
+              jalmnxti_pc_o[ 7:2]                  = irq_id_instant_q; // output the offset part of the jump target address
+              jalmnxti_pc_o[ 1:0]                  = '0;               // XLEN is fixed to 32, so XLEN/8 = 4
+            end else begin
+              // to check if irq_i is onehot
+              `ifndef VERILATOR
+                assert final ($onehot0(irq_q)) else
+                $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+              `endif
+              // mil, excode remain their original value when the conditions are not met
+              mintstatus_n.mil = mintstatus_q.mil;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
+            end
+          end
+        end
         // mepc: exception program counter
-        CSR_MEPC:
-        if (csr_we_int) begin
-          mepc_n = csr_wdata_int & ~32'b1;  // force 16-bit alignment
+        CSR_MEPC: if (csr_we_int) begin
+          mepc_n = csr_wdata_int & ~32'b1; // force 16-bit alignment
         end
         // mcause
         CSR_MCAUSE:
@@ -1156,6 +1291,10 @@ module cv32e40p_cs_registers
       mtvec_mode_n = mtvec_mode_q;
       utvec_mode_n = '0;  // Not used if PULP_SECURE == 0
 
+      irq_ack_mnxti_n = '0; // to ensure that irq_ack_mnxti_o is a pulse 
+      jalmnxti_ctrl_o = '0;
+      jalmnxti_pc_o = '0;
+
       if (FPU == 1) if (fflags_we_i) fflags_n = fflags_i | fflags_q;
 
       case (csr_addr_i)
@@ -1209,10 +1348,55 @@ module cv32e40p_cs_registers
 //      CSR_MSCRATCHCSWL:
 //        if ((csr_we_int) && ((mpil_q == 0) != (mintstatus_q.mil == 0)))
 //          mscratch_n = csr_wdata_int;
+        // mnxti: next intertupt handler address and interrupt-enable CSR
+        CSR_MNXTI: begin
+          if (csr_we_int) begin
+            mstatus_n.mie = mstatus_q.mie | csr_wdata_int[3]; //enable interrupt regardless of the conditions
+            if (mnxti_pass) begin
+              // update mil, excode and set ack signal if the conditions are met
+              mintstatus_n.mil                     = irq_level_q;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = irq_id_instant_q;
+              irq_ack_mnxti_n                      = 1'b1;
+            end else begin
+              // to check if irq_i is onehot
+              `ifndef VERILATOR
+                assert final ($onehot0(irq_q)) else
+                $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+              `endif
+              // mil, excode remain their original value when the conditions are not met
+              mintstatus_n.mil = mintstatus_q.mil;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
+            end
+          end
+        end
+        // jalmnxti: jump and link version of mnxti CSR
+        CSR_JALMNXTI: begin
+          if (csr_we_int) begin
+            mstatus_n.mie = mstatus_q.mie | csr_wdata_int[3]; //enable interrupt regardless of the conditions
+            if (mnxti_pass) begin
+              // update mil, excode and set ack signal if the conditions are met
+              mintstatus_n.mil                     = irq_level_q;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = irq_id_instant_q;
+              irq_ack_mnxti_n                      = 1'b1;
+              jalmnxti_ctrl_o                      = 1'b1;             // set the jump req signal
+              jalmnxti_pc_o[31:8]                  = mtvt_q;           // output the base address part of the jump target address
+              jalmnxti_pc_o[ 7:2]                  = irq_id_instant_q; // output the offset part of the jump target address
+              jalmnxti_pc_o[ 1:0]                  = '0;               // XLEN is fixed to 32, so XLEN/8 = 4
+            end else begin
+              // to check if irq_i is onehot
+              `ifndef VERILATOR
+                assert final ($onehot0(irq_q)) else
+                $fatal(1, "[cv32e40p] More than two bit set in irq_i (one-hot)");
+              `endif
+              // mil, excode remain their original value when the conditions are not met
+              mintstatus_n.mil = mintstatus_q.mil;
+              mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
+            end
+          end
+        end
         // mepc: exception program counter
-        CSR_MEPC:
-        if (csr_we_int) begin
-          mepc_n = csr_wdata_int & ~32'b1;  // force 16-bit alignment
+        CSR_MEPC: if (csr_we_int) begin
+          mepc_n = csr_wdata_int & ~32'b1; // force 16-bit alignment
         end
         // mcause
         CSR_MCAUSE:
@@ -1482,7 +1666,7 @@ end //PULP_SECURE = 0
     end
   endgenerate
 
-  // actual registers
+  // actual registers and logic variables
   always_ff @(posedge clk, negedge rst_n) begin
     if (rst_n == 1'b0) begin
       frm_q <= '0;
@@ -1505,19 +1689,27 @@ end //PULP_SECURE = 0
           prv:       PRIV_LVL_M,
           default:   '0
       };
-      dscratch0_q <= '0;
-      dscratch1_q <= '0;
-      mscratch_q <= '0;
-      mie_q <= '0;
-      mtvec_q <= '0;
-      mtvt_q <= '0;
-      mtvec_mode_q <= MTVEC_MODE;
-      mintthresh_q <= '0;
-      mintstatus_q <= '0;
-      mpil_q <= '0;
-      minhv_q <= '0;
-      shwint_q <= '0;
-    end else begin
+      dscratch0_q    <= '0;
+      dscratch1_q    <= '0;
+      mscratch_q     <= '0;
+      mie_q          <= '0;
+      mtvec_q        <= '0;
+      mtvt_q         <= '0;
+      mtvec_mode_q   <= MTVEC_MODE;
+      mintthresh_q   <= '0;
+      mintstatus_q   <= '0;
+      mpil_q         <= '0;
+      minhv_q        <= '0;
+      shwint_q       <= '0;
+      // vairables for mnxti csr
+      irq_id_instant_q <= '0;
+      irq_level_q      <= '0;
+      irq_shv_q        <= '0;
+      irq_q            <= '0;
+      irq_ack_mnxti_q  <= '0;
+    end
+    else
+    begin
       // update CSRs
       if (FPU == 1) begin
         frm_q    <= frm_n;
@@ -1538,22 +1730,28 @@ end //PULP_SECURE = 0
                 mprv: 1'b0
               };
       end
-      mepc_q       <= mepc_n;
-      mcause_q     <= mcause_n;
-      depc_q       <= depc_n;
-      dcsr_q       <= dcsr_n;
-      dscratch0_q  <= dscratch0_n;
-      dscratch1_q  <= dscratch1_n;
-      mscratch_q   <= mscratch_n;
-      mie_q        <= mie_n;
-      mtvec_q      <= mtvec_n;
-      mtvt_q       <= mtvt_n;
-      mtvec_mode_q <= mtvec_mode_n;
-      mintthresh_q <= mintthresh_n;
-      mintstatus_q <= mintstatus_n;
-      mpil_q       <= mpil_n;
-      minhv_q      <= minhv_n;
-      shwint_q     <= shwint_n;
+      mepc_q         <= mepc_n;
+      mcause_q       <= mcause_n;
+      depc_q         <= depc_n;
+      dcsr_q         <= dcsr_n;
+      dscratch0_q    <= dscratch0_n;
+      dscratch1_q    <= dscratch1_n;
+      mscratch_q     <= mscratch_n;
+      mie_q          <= mie_n;
+      mtvec_q        <= mtvec_n;
+      mtvt_q         <= mtvt_n;
+      mtvec_mode_q   <= mtvec_mode_n;
+      mintthresh_q   <= mintthresh_n;
+      mintstatus_q   <= mintstatus_n;
+      mpil_q         <= mpil_n;
+      minhv_q        <= minhv_n;
+      shwint_q       <= shwint_n;
+      // vairables for mnxti csr
+      irq_id_instant_q <= irq_id_instant_n;
+      irq_level_q      <= irq_level_n;
+      irq_shv_q        <= irq_shv_n;
+      irq_q            <= irq_n;
+      irq_ack_mnxti_q  <= irq_ack_mnxti_n;
     end
   end
   ////////////////////////////////////////////////////////////////////////

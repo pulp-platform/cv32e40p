@@ -339,6 +339,7 @@ package cv32e40p_pkg;
     // CSR_MSCRATCHCSW    = 12'h348,
     // CSR_MSCRATCHCSWL   = 12'h349,
     CSR_MCLICBASE      = 12'h350,
+    CSR_JALMNXTI       = 12'h351, // customized csr
 
     // Physical memory protection (PMP)
     CSR_PMPCFG0   = 12'h3A0,  // Not included (USE_PMP = 0)
@@ -688,6 +689,7 @@ package cv32e40p_pkg;
   parameter PC_URET = 4'b0110;
   parameter PC_DRET = 4'b0111;
   parameter PC_HWLOOP = 4'b1000;
+  parameter PC_JALMNXTI = 4'b1001;
 
   // Exception PC mux selector defines
   parameter EXC_PC_EXCEPTION = 3'b000;

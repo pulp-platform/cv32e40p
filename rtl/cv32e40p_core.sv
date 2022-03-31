@@ -333,6 +333,11 @@ module cv32e40p_core
   logic                           csr_restore_dret_id;
   logic                           csr_mtvec_init;
   logic        csr_mtvt_init;
+  logic        irq_ack;          // interrupt acknowledge signal sent by id_stage module
+  logic        irq_ack_mnxti;    // interrupt acknowledge signal sent by cs_register module (mnxti csr)
+  logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_instant; // the interrupt id calculated by id_stage module is sent to cs_register module for mnxti operation
+  logic        jalmnxti_ctrl;    // jump req signal sent by cs_register module for jalmnxti csr
+  logic [31:0] jalmnxti_pc;      // jump target address sent by cs_register module for jalmnxti csr
 
   // shadow
   logic                            shadow_en;
@@ -413,6 +418,14 @@ module cv32e40p_core
   assign apu_flags_o = apu_flags_ex;
   assign fflags_csr = apu_flags_i;
   assign apu_type_o  = apu_type_ex;
+
+  // irq_ack signal
+  // The irq_ack signal is determined by either id_stage module under vectoring module
+  // or cs_register module under non-vectoring mode. Since mnxti CSR need the information
+  // of the taken interrupt for further operation, the non-vectoring interrupt taken by
+  // the core cannot be acknowledged and thus cleared immediately
+  assign irq_ack_o = (CLIC_SHV && irq_shv_i) ? irq_ack : irq_ack_mnxti;
+
 
   //////////////////////////////////////////////////////////////////////////////////////////////
   //   ____ _            _      __  __                                                   _    //
@@ -555,6 +568,8 @@ module cv32e40p_core
 
       .if_busy_o   (if_busy),
       .perf_imiss_o(perf_imiss)
+      .jalmnxti_pc_i   (jalmnxti_pc),  // jump target address from cs_register module
+      .jalmnxti_ctrl_i (jalmnxti_ctrl) // jump req from jalmnxti csr
   );
 
 
@@ -748,7 +763,7 @@ module cv32e40p_core
       .u_irq_enable_i(u_irq_enable),
       .mintthresh_i  (mintthresh),
       .mintstatus_i  (mintstatus),
-      .irq_ack_o     (irq_ack_o),
+      .irq_ack_o     (irq_ack),
       .irq_id_o      (irq_id_o),
 
       // Debug Signal
@@ -1061,6 +1076,13 @@ module cv32e40p_core
       .u_irq_enable_o(u_irq_enable),
       .mintthresh_o  (mintthresh),
       .mintstatus_o  (mintstatus),
+      .irq_level_i   (irq_level_i),      // input interrupt level for mnxti csr operation
+      .irq_shv_i     (irq_shv_i),        // input interrupr vectoring selection for mnxti csr operation
+      .irq_i         (irq_i),            // onehot signal of input interrupt for mnxti csr operation
+      .irq_id_instant_i(irq_id_instant), // interrupt id for mnxti csr operation
+      .irq_ack_mnxti_o (irq_ack_mnxti),  // interrupt acknowledge signal sent by mnxti csr
+      .jalmnxti_ctrl_o (jalmnxti_ctrl),  // jump req signal sent by jalmnxti csr
+      .jalmnxti_pc_o (jalmnxti_pc),      // jump target address sent by jalmnxti csr
       .csr_irq_sec_i (csr_irq_sec),
       .sec_lvl_o     (sec_lvl_o),
       .mepc_o        (mepc),
