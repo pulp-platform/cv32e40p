@@ -211,6 +211,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     output logic        irq_ack_o,
     output logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_o,
     output logic [$clog2(NUM_INTERRUPTS)-1:0] exc_cause_o,
+    output logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_ctrl_o, // send interrupt id to cs_register module for mnxti csr operation
 
     // Debug Signal
     output logic        debug_mode_o,
@@ -588,6 +589,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
 
   assign mult_en = mult_int_en | mult_dot_en;
 
+  assign irq_id_ctrl_o = irq_id_ctrl; // interrupt id result used in cs_register module for mnxti csr operation
 
   //////////////////////////////////////////////////////////////////
   //      _                         _____                    _    //

@@ -109,7 +109,10 @@ module cv32e40p_if_stage
 
     // misc signals
     output logic        if_busy_o,             // is the IF stage busy fetching instructions?
-    output logic        perf_imiss_o           // Instruction Fetch Miss
+    output logic        perf_imiss_o,          // Instruction Fetch Miss
+
+    input  logic [31:0] jalmnxti_pc_i,         // jump target address calculated from cs_register module for jalmnxti csr
+    input  logic        jalmnxti_ctrl_i        // jump req signal from cs_register module for jalmnxti csr
 );
 
   import cv32e40p_pkg::*;
@@ -138,6 +141,7 @@ module cv32e40p_if_stage
   logic [31:0]       instr_aligned;
   logic [31:0]       instr_decompressed;
   logic              instr_compressed_int;
+  logic              pc_set_jalmnxti;      // pc set enable signal for jalmnxti csr
 
 
   // exception PC selection mux
@@ -177,25 +181,32 @@ module cv32e40p_if_stage
     // Default assign PC_BOOT (should be overwritten in below case)
     branch_addr_n = {boot_addr_i[31:2], 2'b0};
     minhv_o       = 1'b0;
+    pc_set_jalmnxti = '0;             // clear pc_set for jalmnxti csr
 
-    unique case (pc_mux_i)
-      PC_BOOT:      begin branch_addr_n = {boot_addr_i[31:2], 2'b0}; minhv_o = 1'b0; end
-      PC_JUMP:      begin branch_addr_n = jump_target_id_i; minhv_o = 1'b0; end
-      PC_BRANCH:    begin branch_addr_n = jump_target_ex_i; minhv_o = 1'b0; end
-      PC_EXCEPTION: begin
-        if (CLIC && CLIC_SHV && irq_shv_i) begin
-          branch_addr_n = exc_pc;
-          minhv_o = 1'b1;
-        end else
-          branch_addr_n = exc_pc; // set PC to exception handler
-      end
-      PC_MRET:      begin branch_addr_n = mepc_i; minhv_o = 1'b0; end // PC is restored when returning from IRQ/exception
-      PC_URET:      begin branch_addr_n = uepc_i; minhv_o = 1'b0; end // PC is restored when returning from IRQ/exception
-      PC_DRET:      begin branch_addr_n = depc_i; minhv_o = 1'b0; end //
-      PC_FENCEI:    begin branch_addr_n = pc_id_o + 4; minhv_o = 1'b0; end // jump to next instr forces prefetch buffer reload
-      PC_HWLOOP:    begin branch_addr_n = hwlp_target_i; minhv_o = 1'b0; end
-      default:;
-    endcase
+    if (jalmnxti_ctrl_i) begin        // jump req from jalmnxti csr
+      branch_addr_n = jalmnxti_pc_i;  // get jump target address from jalmnxti csr
+      minhv_o = 1'b0;
+      pc_set_jalmnxti = 1'b1;         // pc set enable signal for jalmnxti csr
+    end else begin
+      unique case (pc_mux_i)
+        PC_BOOT:      begin branch_addr_n = {boot_addr_i[31:2], 2'b0}; minhv_o = 1'b0; end
+        PC_JUMP:      begin branch_addr_n = jump_target_id_i; minhv_o = 1'b0; end
+        PC_BRANCH:    begin branch_addr_n = jump_target_ex_i; minhv_o = 1'b0; end
+        PC_EXCEPTION: begin
+          if (CLIC && CLIC_SHV && irq_shv_i) begin
+            branch_addr_n = exc_pc;
+            minhv_o = 1'b1;
+          end else
+            branch_addr_n = exc_pc; // set PC to exception handler
+        end
+        PC_MRET:      begin branch_addr_n = mepc_i; minhv_o = 1'b0; end // PC is restored when returning from IRQ/exception
+        PC_URET:      begin branch_addr_n = uepc_i; minhv_o = 1'b0; end // PC is restored when returning from IRQ/exception
+        PC_DRET:      begin branch_addr_n = depc_i; minhv_o = 1'b0; end //
+        PC_FENCEI:    begin branch_addr_n = pc_id_o + 4; minhv_o = 1'b0; end // jump to next instr forces prefetch buffer reload
+        PC_HWLOOP:    begin branch_addr_n = hwlp_target_i; minhv_o = 1'b0; end
+        default:;
+      endcase
+    end
   end
 
   // tell CS register file to initialize mtvec on boot
@@ -248,7 +259,7 @@ module cv32e40p_if_stage
     fetch_ready   = 1'b0;
     branch_req    = 1'b0;
     // take care of jumps and branches
-    if (pc_set_i) begin
+    if (pc_set_i || pc_set_jalmnxti) begin  // either pc_set from controller or pc_set from jalmnxti can cause the jump req
       branch_req    = 1'b1;
     end
     else if (fetch_valid) begin

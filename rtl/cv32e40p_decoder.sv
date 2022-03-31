@@ -2402,7 +2402,7 @@ module cv32e40p_decoder import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*;
               CSR_MARCHID,
               CSR_MIMPID,
               CSR_MHARTID,
-              CSR_MCLICBASE :
+              CSR_MCLICBASE: 
                 if(csr_op != CSR_OP_READ) csr_illegal = 1'b1;
 
             // These are valid CSR registers
@@ -2413,7 +2413,9 @@ module cv32e40p_decoder import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*;
               CSR_MCAUSE,
               CSR_MINTTHRESH, // TODO: do we need to treat this as status reg? // TODO: gate when CLIC = 0
               CSR_MINTSTATUS,
-              CSR_MSHWINT:
+              CSR_MSHWINT,
+              CSR_MNXTI,
+              CSR_JALMNXTI:
                 // Not illegal, but treat as status CSR for side effect handling
                 csr_status_o = 1'b1;
 

@@ -34,7 +34,7 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   parameter PULP_CLUSTER        =  0,                   // PULP Cluster interface (incl. p.elw)
   parameter FPU                 =  0,                   // Floating Point Unit (interfaced via APU interface)
   parameter PULP_ZFINX          =  0,                   // Float-in-General Purpose registers
-  parameter CLIC                =  0,                   // Core Local Interrupt Controller
+  parameter CLIC                =  1,                   // Core Local Interrupt Controller
   parameter NUM_MHPMCOUNTERS    =  1,
   parameter NUM_INTERRUPTS      =  32,
   parameter MCLICBASE_ADDR      =  32'h1A200000,        // Base address for CLIC memory mapped registers
@@ -329,6 +329,11 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   logic        csr_restore_dret_id;
   logic        csr_mtvec_init;
   logic        csr_mtvt_init;
+  logic        irq_ack;          // interrupt acknowledge signal sent by id_stage module
+  logic        irq_ack_mnxti;    // interrupt acknowledge signal sent by cs_register module (mnxti csr)
+  logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_instant; // the interrupt id calculated by id_stage module is sent to cs_register module for mnxti operation
+  logic        jalmnxti_ctrl;    // jump req signal sent by cs_register module for jalmnxti csr
+  logic [31:0] jalmnxti_pc;      // jump target address sent by cs_register module for jalmnxti csr
 
   // shadow
   logic                            shadow_en;
@@ -409,6 +414,14 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   assign apu_flags_o = apu_flags_ex;
   assign fflags_csr  = apu_flags_i;
   assign apu_type_o  = apu_type_ex;
+
+  // irq_ack signal
+  // The irq_ack signal is determined by either id_stage module under vectoring module
+  // or cs_register module under non-vectoring mode. Since mnxti CSR need the information
+  // of the taken interrupt for further operation, the non-vectoring interrupt taken by
+  // the core cannot be acknowledged and thus cleared immediately
+  assign irq_ack_o = (CLIC_SHV && irq_shv_i) ? irq_ack : irq_ack_mnxti;
+
 
   //////////////////////////////////////////////////////////////////////////////////////////////
   //   ____ _            _      __  __                                                   _    //
@@ -556,7 +569,10 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .id_ready_i          ( id_ready          ),
 
     .if_busy_o           ( if_busy           ),
-    .perf_imiss_o        ( perf_imiss        )
+    .perf_imiss_o        ( perf_imiss        ), 
+
+    .jalmnxti_pc_i       ( jalmnxti_pc       ), // jump target address from cs_register module
+    .jalmnxti_ctrl_i     ( jalmnxti_ctrl     )  // jump req from jalmnxti csr
   );
 
 
@@ -753,8 +769,9 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .u_irq_enable_i               ( u_irq_enable         ),
     .mintthresh_i                 ( mintthresh           ),
     .mintstatus_i                 ( mintstatus           ),
-    .irq_ack_o                    ( irq_ack_o            ),
+    .irq_ack_o                    ( irq_ack              ), // interrupt acknowledge signal sent by id_stage
     .irq_id_o                     ( irq_id_o             ),
+    .irq_id_ctrl_o                ( irq_id_instant       ), // irq_id_ctrl_o is sent to cs_register module for mnxti csr operation
 
     // Debug Signal
     .debug_mode_o                 ( debug_mode           ),
@@ -1035,6 +1052,8 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .DEBUG_TRIGGER_EN  ( DEBUG_TRIGGER_EN      ),
     .CLIC              ( CLIC                  ),
     .NUM_INTERRUPTS    ( NUM_INTERRUPTS        ),
+    .CLIC_SHV          ( 1'b1                  ),// Here we set CLIC_SHV as 1, actually CLIC_SHV should be determined by global vertoring selecting, and we don't
+                                                 // use the local parameter defined before since the local parameter cannot propagate down to this submodule.
     .MCLICBASE_ADDR    ( MCLICBASE_ADDR        ),
     .SHADOW            ( SHADOW                )
   )
@@ -1074,6 +1093,13 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .u_irq_enable_o             ( u_irq_enable           ),
     .mintthresh_o               ( mintthresh             ),
     .mintstatus_o               ( mintstatus             ),
+    .irq_level_i                ( irq_level_i            ), // input interrupt level for mnxti csr operation
+    .irq_shv_i                  ( irq_shv_i              ), // input interrupr vectoring selection for mnxti csr operation
+    .irq_i                      ( irq_i                  ), // onehot signal of input interrupt for mnxti csr operation
+    .irq_id_instant_i           ( irq_id_instant         ), // interrupt id for mnxti csr operation
+    .irq_ack_mnxti_o            ( irq_ack_mnxti          ), // interrupt acknowledge signal sent by mnxti csr 
+    .jalmnxti_ctrl_o            ( jalmnxti_ctrl          ), // jump req signal sent by jalmnxti csr
+    .jalmnxti_pc_o              ( jalmnxti_pc            ), // jump target address sent by jalmnxti csr
     .csr_irq_sec_i              ( csr_irq_sec            ),
     .sec_lvl_o                  ( sec_lvl_o              ),
     .mepc_o                     ( mepc                   ),
