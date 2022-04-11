@@ -83,6 +83,8 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   output logic [31:0] shadow_wdata_o,
   input  logic [31:0] shadow_rdata_i,
 
+  output logic [5:0]  data_atop_o, // atomic operation, only active if parameter `A_EXTENSION != 0
+
   // apu-interconnect
   // handshake signals
   output logic                           apu_req_o,
@@ -123,7 +125,7 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   localparam PULP_SECURE         =  0;
   localparam N_PMP_ENTRIES       = 16;
   localparam USE_PMP             =  0;          // if PULP_SECURE is 1, you can still not use the PMP
-  localparam A_EXTENSION         =  0;
+  localparam A_EXTENSION         =  1;
   localparam DEBUG_TRIGGER_EN    =  1;
 
   // PULP bus interface behavior
@@ -141,7 +143,7 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   // Left in code (with their original _i, _o postfixes) for future design extensions;
   // these used to be former inputs/outputs of RI5CY
 
-  logic [5:0]                     data_atop_o;  // atomic operation, only active if parameter `A_EXTENSION != 0`
+  //logic [5:0]                     data_atop_o; // atomic operation, only active if parameter `A_EXTENSION != 0`
   logic                           irq_sec_i;
   logic                           sec_lvl_o;
 
