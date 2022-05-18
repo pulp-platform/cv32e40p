@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cv32e40p_regfile_rtl:
-  targets: [
-    rtl,
-    tsmc55,
-    gf22,
-    tsmc65,
-  ]
-  incdirs: [
-    ./rtl/include,
-  ]
-  files: [
-    ./rtl/cv32e40p_register_file_ff.sv,
-  ]
-
 cv32e40p:
   vlog_opts: [
     -L fpnew_lib,
@@ -107,6 +93,7 @@ cv32e40p_regfile_rtl:
     rtl,
     tsmc55,
     gf22,
+    tsmc65,
   ]
   incdirs: [
     ./rtl/include,
