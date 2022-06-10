@@ -682,7 +682,7 @@ package cv32e40p_pkg;
   parameter EXC_CAUSE_ECALL_MMODE = 5'h0B;
 
   // Interrupt mask
-  parameter IRQ_MASK = 32'hFFFF0888;
+  parameter IRQ_MASK = 32'hFFFFFFFF;
 
   // Trap mux selector
   parameter TRAP_MACHINE = 2'b00;
