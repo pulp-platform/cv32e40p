@@ -1404,6 +1404,7 @@ end //PULP_SECURE = 0
             ucause_q       <= '0;
             utvec_q        <= '0;
             utvec_mode_q   <= MTVEC_MODE;
+            utvt_q         <= '0;
             priv_lvl_q     <= PRIV_LVL_M;
           end
           else
@@ -1412,6 +1413,7 @@ end //PULP_SECURE = 0
             ucause_q       <= ucause_n;
             utvec_q        <= utvec_n;
             utvec_mode_q   <= utvec_mode_n;
+            utvt_q         <= utvt_n;
             priv_lvl_q     <= priv_lvl_n;
           end
         end
@@ -1422,6 +1424,7 @@ end //PULP_SECURE = 0
         assign ucause_q     = '0;
         assign utvec_q      = '0;
         assign utvec_mode_q = '0;
+        assign utvt_q       = '0;
         assign priv_lvl_q   = PRIV_LVL_M;
   end
   endgenerate
