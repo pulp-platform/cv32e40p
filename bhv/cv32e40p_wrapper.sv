@@ -36,7 +36,8 @@ module cv32e40p_wrapper
     parameter NUM_EXTERNAL_PERF = 0,
     parameter NUM_INTERRUPTS = 32,  // Number of interrupt lines
     parameter CLIC = 0,  // Whether we use the Core-local interrupt controller
-    parameter MCLICBASE_ADDR = 32'h1A200000       // Base address for CLIC memory mapped registers
+    parameter MCLICBASE_ADDR = 32'h1A200000, // Base address for CLIC memory mapped registers
+    parameter SHADOW = 0                     // register shadow saving extension
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -69,6 +70,16 @@ module cv32e40p_wrapper
     output logic [31:0] data_addr_o,
     output logic [31:0] data_wdata_o,
     input  logic [31:0] data_rdata_i,
+
+    // shadow store memory interface
+    output logic        shadow_req_o,
+    input  logic        shadow_gnt_i,
+    input  logic        shadow_rvalid_i,
+    output logic        shadow_we_o,
+    output logic [ 3:0] shadow_be_o,
+    output logic [31:0] shadow_addr_o,
+    output logic [31:0] shadow_wdata_o,
+    input  logic [31:0] shadow_rdata_i,
 
     // apu-interconnect
     // handshake signals
@@ -225,7 +236,8 @@ module cv32e40p_wrapper
       .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF),
       .NUM_INTERRUPTS  (NUM_INTERRUPTS),
       .CLIC            (CLIC),
-      .MCLICBASE_ADDR  (MCLICBASE_ADDR)
+      .MCLICBASE_ADDR  (MCLICBASE_ADDR),
+      .SHADOW          (SHADOW)
   ) core_i (
       .*
   );

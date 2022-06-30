@@ -364,6 +364,12 @@ module cv32e40p_load_store_unit #(
   assign trans_wdata = data_wdata;
   assign trans_atop  = data_atop_ex_i;
 
+  // Block transactions that touch the range that is being saved by the shadow
+  // Begister logic
+
+  // TODO: assume 8 byte stack alignment (works for both integer and embedded abi)
+  //assign is_in_shadow_range = trans_addr < shadow_sp && trans_addr >= shadow_sp - (shadow_level << 2);
+
   // Transaction request generation
   generate
     if (PULP_OBI == 0) begin : gen_no_pulp_obi

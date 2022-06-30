@@ -47,7 +47,8 @@ module cv32e40p_id_stage
     parameter APU_NUSFLAGS_CPU = 5,
     parameter DEBUG_TRIGGER_EN = 1,
     parameter CLIC = 1,
-    parameter NUM_INTERRUPTS = 32
+    parameter NUM_INTERRUPTS = 32,
+    parameter SHADOW = 0
 
 ) (
     input logic clk,  // Gated clock
@@ -137,8 +138,8 @@ module cv32e40p_id_stage
     output logic        mult_clpx_img_ex_o,
 
     // APU
-<<<<<<< HEAD
     output logic                              apu_en_ex_o,
+    output logic [                 2:0]       apu_type_ex_o,
     output logic [     APU_WOP_CPU-1:0]       apu_op_ex_o,
     output logic [                 1:0]       apu_lat_ex_o,
     output logic [   APU_NARGS_CPU-1:0][31:0] apu_operands_ex_o,
@@ -154,25 +155,6 @@ module cv32e40p_id_stage
     output logic                 apu_perf_dep_o,
     input  logic                 apu_busy_i,
     input  logic [C_RM-1:0]      frm_i,
-=======
-    output logic                        apu_en_ex_o,
-    output logic [2:0]                  apu_type_ex_o,
-    output logic [APU_WOP_CPU-1:0]      apu_op_ex_o,
-    output logic [1:0]                  apu_lat_ex_o,
-    output logic [APU_NARGS_CPU-1:0][31:0]                 apu_operands_ex_o,
-    output logic [APU_NDSFLAGS_CPU-1:0] apu_flags_ex_o,
-    output logic [5:0]                  apu_waddr_ex_o,
-
-    output logic [2:0][5:0]            apu_read_regs_o,
-    output logic [2:0]                 apu_read_regs_valid_o,
-    input  logic                       apu_read_dep_i,
-    output logic [1:0][5:0]            apu_write_regs_o,
-    output logic [1:0]                 apu_write_regs_valid_o,
-    input  logic                       apu_write_dep_i,
-    output logic                       apu_perf_dep_o,
-    input  logic                       apu_busy_i,
-    input  logic [C_RM-1:0]            frm_i,
->>>>>>> a5a83f1... ips/cv32e40p: Fix core logic to support decoupled FP units
 
     // CSR ID/EX
     output logic              csr_access_ex_o,
@@ -275,7 +257,20 @@ module cv32e40p_id_stage
     output logic mhpmevent_pipe_stall_o,
 
     input logic        perf_imiss_i,
-    input logic [31:0] mcounteren_i
+    input logic [31:0] mcounteren_i,
+
+    input logic shadow_en_i,
+    input logic shadow_csr_save_i,
+    input logic [31:0]                     shadow_mepc_i,
+    input logic [$clog2(NUM_INTERRUPTS):0] shadow_mcause_i,
+    output logic shadow_req_o,
+    input logic shadow_gnt_i,
+    input logic shadow_rvalid_i,
+    output logic shadow_we_o,
+    output logic [3:0] shadow_be_o,
+    output logic [31:0] shadow_addr_o,
+    output logic [31:0] shadow_wdata_o,
+    input logic [31:0] shadow_rdata_i             
 );
 
   // Source/Destination register instruction index
@@ -405,18 +400,11 @@ module cv32e40p_id_stage
   logic [cv32e40p_fpu_pkg::INT_FORMAT_BITS-1:0] fpu_int_fmt;
 
   // APU signals
-<<<<<<< HEAD
   logic apu_en;
+  logic [2:0] apu_type;
   logic [APU_WOP_CPU-1:0] apu_op;
   logic [1:0] apu_lat;
   logic [APU_NARGS_CPU-1:0][31:0] apu_operands;
-=======
-  logic                        apu_en;
-  logic [2:0]                  apu_type;
-  logic [APU_WOP_CPU-1:0]      apu_op;
-  logic [1:0]                  apu_lat;
-  logic [APU_NARGS_CPU-1:0][31:0]                 apu_operands;
->>>>>>> a5a83f1... ips/cv32e40p: Fix core logic to support decoupled FP units
   logic [APU_NDSFLAGS_CPU-1:0] apu_flags;
   logic [5:0] apu_waddr;
 
@@ -947,11 +935,23 @@ module cv32e40p_id_stage
   //                                                     //
   /////////////////////////////////////////////////////////
 
+  logic [5:0]  shadow_reg_raddr;
+  logic [31:0] shadow_reg_rdata;
+  logic [31:0] shadow_reg_sp;
+  logic        shadow_irq;
+  logic        shadow_ready;
+
+  // ABI = "standard": RISC-V standard integer ABI
+  // EABI = "eabi":    RISC-V embedded ABI
+  localparam ABI = "standard";
+
   cv32e40p_register_file #(
       .ADDR_WIDTH(6),
       .DATA_WIDTH(32),
       .FPU       (FPU),
-      .PULP_ZFINX(PULP_ZFINX)
+      .PULP_ZFINX(PULP_ZFINX),
+      .SHADOW    (SHADOW),
+      .ABI       (ABI)
   ) register_file_i (
       .clk  (clk),
       .rst_n(rst_n),
@@ -978,9 +978,54 @@ module cv32e40p_id_stage
       // Write port b
       .waddr_b_i(regfile_alu_waddr_fw_i),
       .wdata_b_i(regfile_alu_wdata_fw_i),
-      .we_b_i   (regfile_alu_we_fw_i)
+      .we_b_i   (regfile_alu_we_fw_i),
+
+      // shadow register
+      .shadow_csr_save_i (shadow_csr_save_i),
+      .shadow_mepc_i (shadow_mepc_i),
+      .shadow_mcause_i (shadow_mcause_i),
+      .shadow_save_i (shadow_irq && shadow_en_i),
+      .shadow_raddr_i (shadow_reg_raddr),
+      .shadow_rdata_o (shadow_reg_rdata),
+      .shadow_sp_o (shadow_reg_sp)
   );
 
+  if (SHADOW) begin : gen_shadow_irq
+    assign shadow_irq = irq_ack_o;
+  end else begin : gen_no_shadow_irq
+    assign shadow_irq = 1'b0;
+  end
+
+  if (SHADOW) begin : gen_shadow_controller
+    cv32e40p_shadow_controller #(
+      .ADDR_WIDTH         ( 6                ),
+      .DATA_WIDTH         ( 32               ),
+      .NUM_SHADOW_SAVES   ( ABI == "standard" ? 16 : (ABI == "eabi" ? 7 : -1) )
+    ) shadow_controller_i (
+      .clk_i              ( clk                       ),
+      .rst_ni             ( rst_n                     ),
+      .shadow_irq_i       ( shadow_irq && shadow_en_i ),
+      .shadow_ready_o     ( shadow_ready              ),
+      .shadow_save_level_o(), // TODO: connect
+      .shadow_reg_raddr_o ( shadow_reg_raddr          ),
+      .shadow_reg_rdata_i ( shadow_reg_rdata          ),
+      .shadow_reg_sp_i    ( shadow_reg_sp             ),
+      .shadow_req_o       ( shadow_req_o              ),
+      .shadow_gnt_i       ( shadow_gnt_i              ),
+      .shadow_rvalid_i    ( shadow_rvalid_i           ),
+      .shadow_we_o        ( shadow_we_o               ),
+      .shadow_be_o        ( shadow_be_o               ),
+      .shadow_addr_o      ( shadow_addr_o             ),
+      .shadow_wdata_o     ( shadow_wdata_o            ),
+      .shadow_rdata_i     ( shadow_rdata_i            )
+    );
+  end else begin : gen_no_shadow_controller
+    assign shadow_req_o = '0;
+    assign shadow_we_o = '0;
+    assign shadow_be_o = '0;
+    assign shadow_addr_o = '0;
+    assign shadow_wdata_o = '0;
+  end
 
   ///////////////////////////////////////////////
   //  ____  _____ ____ ___  ____  _____ ____   //
@@ -991,7 +1036,6 @@ module cv32e40p_id_stage
   //                                           //
   ///////////////////////////////////////////////
 
-<<<<<<< HEAD
   cv32e40p_decoder #(
       .PULP_XPULP      (PULP_XPULP),
       .PULP_CLUSTER    (PULP_CLUSTER),
@@ -1069,6 +1113,7 @@ module cv32e40p_id_stage
       .fpu_dst_fmt_o(fpu_dst_fmt),
       .fpu_int_fmt_o(fpu_int_fmt),
       .apu_en_o     (apu_en),
+      .apu_type_o   (apu_type),
       .apu_op_o     (apu_op),
       .apu_lat_o    (apu_lat),
       .fp_rnd_mode_o(fp_rnd_mode),
@@ -1114,135 +1159,6 @@ module cv32e40p_id_stage
 
       // HPM related control signals
       .mcounteren_i(mcounteren_i)
-=======
-  cv32e40p_decoder
-    #(
-      .PULP_XPULP          ( PULP_XPULP           ),
-      .PULP_CLUSTER        ( PULP_CLUSTER         ),
-      .A_EXTENSION         ( A_EXTENSION          ),
-      .FPU                 ( FPU                  ),
-      .PULP_SECURE         ( PULP_SECURE          ),
-      .USE_PMP             ( USE_PMP              ),
-      .APU_WOP_CPU         ( APU_WOP_CPU          ),
-      .DEBUG_TRIGGER_EN    ( DEBUG_TRIGGER_EN     )
-      )
-  decoder_i
-  (
-    // controller related signals
-    .deassert_we_i                   ( deassert_we               ),
-
-    .illegal_insn_o                  ( illegal_insn_dec          ),
-    .ebrk_insn_o                     ( ebrk_insn_dec             ),
-
-    .mret_insn_o                     ( mret_insn_dec             ),
-    .uret_insn_o                     ( uret_insn_dec             ),
-    .dret_insn_o                     ( dret_insn_dec             ),
-
-    .mret_dec_o                      ( mret_dec                  ),
-    .uret_dec_o                      ( uret_dec                  ),
-    .dret_dec_o                      ( dret_dec                  ),
-
-    .ecall_insn_o                    ( ecall_insn_dec            ),
-    .wfi_o                           ( wfi_insn_dec              ),
-
-    .fencei_insn_o                   ( fencei_insn_dec           ),
-
-    .rega_used_o                     ( rega_used_dec             ),
-    .regb_used_o                     ( regb_used_dec             ),
-    .regc_used_o                     ( regc_used_dec             ),
-
-    .reg_fp_a_o                      ( regfile_fp_a              ),
-    .reg_fp_b_o                      ( regfile_fp_b              ),
-    .reg_fp_c_o                      ( regfile_fp_c              ),
-    .reg_fp_d_o                      ( regfile_fp_d              ),
-
-    .bmask_a_mux_o                   ( bmask_a_mux               ),
-    .bmask_b_mux_o                   ( bmask_b_mux               ),
-    .alu_bmask_a_mux_sel_o           ( alu_bmask_a_mux_sel       ),
-    .alu_bmask_b_mux_sel_o           ( alu_bmask_b_mux_sel       ),
-
-    // from IF/ID pipeline
-    .instr_rdata_i                   ( instr                     ),
-    .illegal_c_insn_i                ( illegal_c_insn_i          ),
-
-    // ALU signals
-    .alu_en_o                        ( alu_en                    ),
-    .alu_operator_o                  ( alu_operator              ),
-    .alu_op_a_mux_sel_o              ( alu_op_a_mux_sel          ),
-    .alu_op_b_mux_sel_o              ( alu_op_b_mux_sel          ),
-    .alu_op_c_mux_sel_o              ( alu_op_c_mux_sel          ),
-    .alu_vec_mode_o                  ( alu_vec_mode              ),
-    .scalar_replication_o            ( scalar_replication        ),
-    .scalar_replication_c_o          ( scalar_replication_c      ),
-    .imm_a_mux_sel_o                 ( imm_a_mux_sel             ),
-    .imm_b_mux_sel_o                 ( imm_b_mux_sel             ),
-    .regc_mux_o                      ( regc_mux                  ),
-    .is_clpx_o                       ( is_clpx                   ),
-    .is_subrot_o                     ( is_subrot                 ),
-
-    // MUL signals
-    .mult_operator_o                 ( mult_operator             ),
-    .mult_int_en_o                   ( mult_int_en               ),
-    .mult_sel_subword_o              ( mult_sel_subword          ),
-    .mult_signed_mode_o              ( mult_signed_mode          ),
-    .mult_imm_mux_o                  ( mult_imm_mux              ),
-    .mult_dot_en_o                   ( mult_dot_en               ),
-    .mult_dot_signed_o               ( mult_dot_signed           ),
-
-    // FPU / APU signals
-    .frm_i                           ( frm_i                     ),
-    .fpu_src_fmt_o                   ( fpu_src_fmt               ),
-    .fpu_dst_fmt_o                   ( fpu_dst_fmt               ),
-    .fpu_int_fmt_o                   ( fpu_int_fmt               ),
-    .apu_en_o                        ( apu_en                    ),
-    .apu_type_o                      ( apu_type                  ),
-    .apu_op_o                        ( apu_op                    ),
-    .apu_lat_o                       ( apu_lat                   ),
-    .fp_rnd_mode_o                   ( fp_rnd_mode               ),
-
-    // Register file control signals
-    .regfile_mem_we_o                ( regfile_we_id             ),
-    .regfile_alu_we_o                ( regfile_alu_we_id         ),
-    .regfile_alu_we_dec_o            ( regfile_alu_we_dec_id     ),
-    .regfile_alu_waddr_sel_o         ( regfile_alu_waddr_mux_sel ),
-
-    // CSR control signals
-    .csr_access_o                    ( csr_access                ),
-    .csr_status_o                    ( csr_status                ),
-    .csr_op_o                        ( csr_op                    ),
-    .current_priv_lvl_i              ( current_priv_lvl_i        ),
-
-    // Data bus interface
-    .data_req_o                      ( data_req_id               ),
-    .data_we_o                       ( data_we_id                ),
-    .prepost_useincr_o               ( prepost_useincr           ),
-    .data_type_o                     ( data_type_id              ),
-    .data_sign_extension_o           ( data_sign_ext_id          ),
-    .data_reg_offset_o               ( data_reg_offset_id        ),
-    .data_load_event_o               ( data_load_event_id        ),
-
-    // Atomic memory access
-    .atop_o                          ( atop_id                   ),
-
-    // hwloop signals
-    .hwlp_we_o                       ( hwlp_we_int               ),
-    .hwlp_target_mux_sel_o           ( hwlp_target_mux_sel       ),
-    .hwlp_start_mux_sel_o            ( hwlp_start_mux_sel        ),
-    .hwlp_cnt_mux_sel_o              ( hwlp_cnt_mux_sel          ),
-
-    // debug mode
-    .debug_mode_i                    ( debug_mode_o              ),
-    .debug_wfi_no_sleep_i            ( debug_wfi_no_sleep        ),
-
-    // jump/branches
-    .ctrl_transfer_insn_in_dec_o     ( ctrl_transfer_insn_in_dec    ),
-    .ctrl_transfer_insn_in_id_o      ( ctrl_transfer_insn_in_id     ),
-    .ctrl_transfer_target_mux_sel_o  ( ctrl_transfer_target_mux_sel ),
-
-    // HPM related control signals
-    .mcounteren_i                    ( mcounteren_i              )
->>>>>>> a5a83f1... ips/cv32e40p: Fix core logic to support decoupled FP units
-
   );
 
   ////////////////////////////////////////////////////////////////////
@@ -1347,6 +1263,10 @@ module cv32e40p_id_stage
       .current_priv_lvl_i(current_priv_lvl_i),
       .irq_ack_o         (irq_ack_o),
       .irq_id_o          (irq_id_o),
+
+      // shadow controller signals
+      .shadow_en_i       (shadow_en_i),
+      .shadow_ready_i    (shadow_ready),
 
       // Debug Signal
       .debug_mode_o          (debug_mode_o),
@@ -1647,7 +1567,6 @@ module cv32e40p_id_stage
   //                                                                             //
   /////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
   always_ff @(posedge clk, negedge rst_n) begin : ID_EX_PIPE_REGISTERS
     if (rst_n == 1'b0) begin
       alu_en_ex_o            <= '0;
@@ -1681,6 +1600,7 @@ module cv32e40p_id_stage
       mult_clpx_img_ex_o     <= 1'b0;
 
       apu_en_ex_o            <= '0;
+      apu_type_ex_o          <= '0;
       apu_op_ex_o            <= '0;
       apu_lat_ex_o           <= '0;
       apu_operands_ex_o[0]   <= '0;
@@ -1715,79 +1635,6 @@ module cv32e40p_id_stage
       branch_in_ex_o         <= 1'b0;
 
     end else if (data_misaligned_i) begin
-=======
-  always_ff @(posedge clk, negedge rst_n)
-  begin : ID_EX_PIPE_REGISTERS
-    if (rst_n == 1'b0)
-    begin
-      alu_en_ex_o                 <= '0;
-      alu_operator_ex_o           <= ALU_SLTU;
-      alu_operand_a_ex_o          <= '0;
-      alu_operand_b_ex_o          <= '0;
-      alu_operand_c_ex_o          <= '0;
-      bmask_a_ex_o                <= '0;
-      bmask_b_ex_o                <= '0;
-      imm_vec_ext_ex_o            <= '0;
-      alu_vec_mode_ex_o           <= '0;
-      alu_clpx_shift_ex_o         <= 2'b0;
-      alu_is_clpx_ex_o            <= 1'b0;
-      alu_is_subrot_ex_o          <= 1'b0;
-
-      mult_operator_ex_o          <= MUL_MAC32;
-      mult_operand_a_ex_o         <= '0;
-      mult_operand_b_ex_o         <= '0;
-      mult_operand_c_ex_o         <= '0;
-      mult_en_ex_o                <= 1'b0;
-      mult_sel_subword_ex_o       <= 1'b0;
-      mult_signed_mode_ex_o       <= 2'b00;
-      mult_imm_ex_o               <= '0;
-
-      mult_dot_op_a_ex_o          <= '0;
-      mult_dot_op_b_ex_o          <= '0;
-      mult_dot_op_c_ex_o          <= '0;
-      mult_dot_signed_ex_o        <= '0;
-      mult_is_clpx_ex_o           <= 1'b0;
-      mult_clpx_shift_ex_o        <= 2'b0;
-      mult_clpx_img_ex_o          <= 1'b0;
-
-      apu_en_ex_o                 <= '0;
-      apu_type_ex_o               <= '0;
-      apu_op_ex_o                 <= '0;
-      apu_lat_ex_o                <= '0;
-      apu_operands_ex_o[0]        <= '0;
-      apu_operands_ex_o[1]        <= '0;
-      apu_operands_ex_o[2]        <= '0;
-      apu_flags_ex_o              <= '0;
-      apu_waddr_ex_o              <= '0;
-
-
-      regfile_waddr_ex_o          <= 6'b0;
-      regfile_we_ex_o             <= 1'b0;
-
-      regfile_alu_waddr_ex_o      <= 6'b0;
-      regfile_alu_we_ex_o         <= 1'b0;
-      prepost_useincr_ex_o        <= 1'b0;
-
-      csr_access_ex_o             <= 1'b0;
-      csr_op_ex_o                 <= CSR_OP_READ;
-
-      data_we_ex_o                <= 1'b0;
-      data_type_ex_o              <= 2'b0;
-      data_sign_ext_ex_o          <= 2'b0;
-      data_reg_offset_ex_o        <= 2'b0;
-      data_req_ex_o               <= 1'b0;
-      data_load_event_ex_o        <= 1'b0;
-      atop_ex_o                   <= 5'b0;
-
-      data_misaligned_ex_o        <= 1'b0;
-
-      pc_ex_o                     <= '0;
-
-      branch_in_ex_o              <= 1'b0;
-
-    end
-    else if (data_misaligned_i) begin
->>>>>>> a5a83f1... ips/cv32e40p: Fix core logic to support decoupled FP units
       // misaligned data access case
       if (ex_ready_i) begin  // misaligned access case, only unstall alu operands
 
@@ -1849,20 +1696,12 @@ module cv32e40p_id_stage
         // APU pipeline
         apu_en_ex_o <= apu_en;
         if (apu_en) begin
-<<<<<<< HEAD
+          apu_type_ex_o     <= apu_type;
           apu_op_ex_o       <= apu_op;
           apu_lat_ex_o      <= apu_lat;
           apu_operands_ex_o <= apu_operands;
           apu_flags_ex_o    <= apu_flags;
           apu_waddr_ex_o    <= apu_waddr;
-=======
-          apu_type_ex_o             <= apu_type;
-          apu_op_ex_o               <= apu_op;
-          apu_lat_ex_o              <= apu_lat;
-          apu_operands_ex_o         <= apu_operands;
-          apu_flags_ex_o            <= apu_flags;
-          apu_waddr_ex_o            <= apu_waddr;
->>>>>>> a5a83f1... ips/cv32e40p: Fix core logic to support decoupled FP units
         end
 
         regfile_we_ex_o <= regfile_we_id;

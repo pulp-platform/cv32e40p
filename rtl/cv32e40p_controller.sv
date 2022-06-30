@@ -128,6 +128,10 @@ module cv32e40p_controller import cv32e40p_pkg::*;
 
   output logic [$clog2(NUM_INTERRUPTS)-1:0]  exc_cause_o,
 
+  // shadow signals
+  input logic          shadow_en_i,
+  input logic          shadow_ready_i,
+
   // Debug Signal
   output logic         debug_mode_o,
   output logic [2:0]   debug_cause_o,
@@ -398,7 +402,11 @@ module cv32e40p_controller import cv32e40p_pkg::*;
         ctrl_fsm_ns = DECODE;
 
         // handle interrupts
-        if (irq_req_ctrl_i && ~(debug_req_pending || debug_mode_q)) begin
+        // wait until shadow saving logic becomes ready to accept another interrupt
+        if (irq_req_ctrl_i && ~shadow_ready_i && shadow_en_i && ~(debug_req_pending || debug_mode_q)) begin
+          halt_if_o         = 1'b1;
+          halt_id_o         = 1'b1;
+        end if (irq_req_ctrl_i && ~(debug_req_pending || debug_mode_q)) begin
           // This assumes that the pipeline is always flushed before
           // going to sleep.
           // Debug mode takes precedence over irq (see DECODE:)
