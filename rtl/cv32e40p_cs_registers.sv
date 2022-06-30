@@ -43,7 +43,8 @@ module cv32e40p_cs_registers import cv32e40p_pkg::*;
   parameter DEBUG_TRIGGER_EN = 1,
   parameter CLIC             = 1,  // TODO: set default to 0
   parameter NUM_INTERRUPTS   = 32,
-  parameter MCLICBASE_ADDR   = 32'h1A200000
+  parameter MCLICBASE_ADDR   = 32'h1A200000,
+  parameter SHADOW           = 0
 )
 (
   // Clock and Reset
@@ -127,6 +128,15 @@ module cv32e40p_cs_registers import cv32e40p_pkg::*;
   input  logic [7:0]      csr_irq_level_i,
   //coming from controller
   input  logic            csr_save_cause_i,
+
+  // to shadow saving logic
+  output logic                            shadow_en_o,
+  output logic                            shadow_block_lw_o,
+  output logic                            shadow_runahead_o,
+  output logic                            shadow_csr_save_o,
+  output logic [31:0]                     shadow_mepc_o,
+  output logic [$clog2(NUM_INTERRUPTS):0] shadow_mcause_o,
+
   // Hardware loops
   input  logic [N_HWLP-1:0] [31:0] hwlp_start_i,
   input  logic [N_HWLP-1:0] [31:0] hwlp_end_i,
@@ -235,6 +245,16 @@ module cv32e40p_cs_registers import cv32e40p_pkg::*;
    logic  [MAX_N_PMP_ENTRIES-1:0] [ 7:0] pmpcfg;
   } Pmp_t;
 
+  typedef struct packed {
+    // make lsu stall when load/store hazard possible with register being saved from shadow
+    logic        blocklw;
+    // Allow core to run ahead of shadow register saving logic. This allows for
+    // lower interrupt latency if lw/sw only accesses shadow registers that are already saved.
+    logic        runahead;
+    // enable shadow saving logic
+    logic        en;
+  } Shwint_t;
+
   // CSR update logic
   logic [31:0] csr_wdata_int;
   logic [31:0] csr_rdata_int;
@@ -275,6 +295,7 @@ module cv32e40p_cs_registers import cv32e40p_pkg::*;
   Mintstatus_t mintstatus_n, mintstatus_q;
   logic [7:0]  mpil_n, mpil_q;
   logic        minhv_n, minhv_q;
+  Shwint_t     shwint_n, shwint_q;
 
   logic [31:0] csr_mie_wdata;
   logic        csr_mie_we;
@@ -756,6 +777,9 @@ end else begin : gen_no_pulp_secure_read_logic // PULP_SECURE == 0
       CSR_UHARTID: csr_rdata_int = !PULP_XPULP ? 'b0 : hart_id_i;
       // current priv level (not official)
       CSR_PRIVLV: csr_rdata_int = !PULP_XPULP ? 'b0 : {30'h0, priv_lvl_q};
+
+      CSR_MSHWINT: csr_rdata_int = {29'b0, shwint_q};
+
       default:
         csr_rdata_int = '0;
     endcase
@@ -1129,6 +1153,11 @@ end else begin : gen_no_pulp_secure_write_logic //PULP_SECURE == 0
     mpil_n                   = mpil_q;
     minhv_n                  = minhv_q;
 
+    shwint_n                 = shwint_q;
+    shadow_csr_save_o        = 1'b0;
+    shadow_mcause_o          = '0;
+    shadow_mepc_o            = '0;
+
     mtvec_mode_n             = mtvec_mode_q;
     utvec_mode_n             = '0;              // Not used if PULP_SECURE == 0
 
@@ -1206,6 +1235,12 @@ end else begin : gen_no_pulp_secure_write_logic //PULP_SECURE == 0
       // mintthres: interrupt-level threshold (clic)
       CSR_MINTTHRESH: if (csr_we_int) mintthresh_n = csr_wdata_int[7:0];
 
+      // mshwint: custom machine csr for configuring shadow interrupt logic
+      CSR_MSHWINT:
+        if (csr_we_int && SHADOW) begin
+          shwint_n = csr_wdata_int[2:0];
+        end
+
       // debug
       CSR_DCSR:
                if (csr_we_int)
@@ -1275,21 +1310,31 @@ end else begin : gen_no_pulp_secure_write_logic //PULP_SECURE == 0
             dcsr_n.cause = debug_cause_i;
             depc_n       = exception_pc;
         end else if (is_irq) begin // interrupts
-            priv_lvl_n       = PRIV_LVL_M;
-            mstatus_n.mpie   = mstatus_q.mie;
-            mstatus_n.mie    = 1'b0;
-            mstatus_n.mpp    = PRIV_LVL_M;
-            mepc_n           = exception_pc;
-            mcause_n         = csr_cause_i;
-            mpil_n           = mintstatus_q.mil;
-            mintstatus_n.mil = csr_irq_level_i;
+            priv_lvl_n        = PRIV_LVL_M;
+            mstatus_n.mpie    = mstatus_q.mie;
+            mstatus_n.mie     = 1'b0;
+            mstatus_n.mpp     = PRIV_LVL_M;
+            mepc_n            = exception_pc;
+            mcause_n          = csr_cause_i;
+            mpil_n            = mintstatus_q.mil;
+            mintstatus_n.mil  = csr_irq_level_i;
+            if (SHADOW) begin
+              shadow_csr_save_o = 1'b1;
+              shadow_mepc_o     = exception_pc;
+              shadow_mcause_o   = csr_cause_i;
+            end
         end else begin // exceptions
-            priv_lvl_n     = PRIV_LVL_M;
-            mstatus_n.mpie = mstatus_q.mie;
-            mstatus_n.mie  = 1'b0;
-            mstatus_n.mpp  = PRIV_LVL_M;
-            mepc_n = exception_pc;
-            mcause_n       = csr_cause_i;
+            priv_lvl_n        = PRIV_LVL_M;
+            mstatus_n.mpie    = mstatus_q.mie;
+            mstatus_n.mie     = 1'b0;
+            mstatus_n.mpp     = PRIV_LVL_M;
+            mepc_n            = exception_pc;
+            mcause_n          = csr_cause_i;
+            if (SHADOW) begin
+              shadow_csr_save_o = 1'b1;
+              shadow_mepc_o     = exception_pc;
+              shadow_mcause_o   = csr_cause_i;
+            end
             // mintstatus_n, mpil_n: horizontal synchronous traps preserve the
             // interrupt level
         end
@@ -1346,7 +1391,7 @@ end //PULP_SECURE = 0
   assign mtvec_o         = mtvec_q;
   assign mtvt_o          = mtvt_q;
   assign utvec_o         = utvec_q;
-  assign utvt_o          = utvt_q;
+  assign utvt_o          = utvt_q; // TODO: tie to zero
   assign mtvec_mode_o    = mtvec_mode_q;
   assign utvec_mode_o    = utvec_mode_q;
 
@@ -1366,6 +1411,10 @@ end //PULP_SECURE = 0
   assign debug_single_step_o  = dcsr_q.step;
   assign debug_ebreakm_o      = dcsr_q.ebreakm;
   assign debug_ebreaku_o      = dcsr_q.ebreaku;
+
+  assign shadow_en_o       = shwint_q.en;
+  assign shadow_runahead_o = shwint_q.runahead;
+  assign shadow_block_lw_o = shwint_q.blocklw;
 
   generate
   if (PULP_SECURE == 1)
@@ -1465,6 +1514,7 @@ end //PULP_SECURE = 0
       mintstatus_q   <= '0;
       mpil_q         <= '0;
       minhv_q        <= '0;
+      shwint_q       <= '0;
     end
     else
     begin
@@ -1503,6 +1553,7 @@ end //PULP_SECURE = 0
       mintstatus_q   <= mintstatus_n;
       mpil_q         <= mpil_n;
       minhv_q        <= minhv_n;
+      shwint_q       <= shwint_n;
     end
   end
  ////////////////////////////////////////////////////////////////////////

@@ -37,7 +37,8 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   parameter CLIC                =  0,                   // Core Local Interrupt Controller
   parameter NUM_MHPMCOUNTERS    =  1,
   parameter NUM_INTERRUPTS      =  32,
-  parameter MCLICBASE_ADDR      =  32'h1A200000        // Base address for CLIC memory mapped registers
+  parameter MCLICBASE_ADDR      =  32'h1A200000,        // Base address for CLIC memory mapped registers
+  parameter SHADOW              =  0                    // register shadow saving extension
 )
 (
   // Clock and Reset
@@ -71,6 +72,16 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   output logic [31:0] data_addr_o,
   output logic [31:0] data_wdata_o,
   input  logic [31:0] data_rdata_i,
+
+  // shadow store memory interface
+  output logic        shadow_req_o,
+  input  logic        shadow_gnt_i,
+  input  logic        shadow_rvalid_i,
+  output logic        shadow_we_o,
+  output logic [3:0]  shadow_be_o,
+  output logic [31:0] shadow_addr_o,
+  output logic [31:0] shadow_wdata_o,
+  input  logic [31:0] shadow_rdata_i,
 
   // apu-interconnect
   // handshake signals
@@ -319,6 +330,14 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
   logic        csr_mtvec_init;
   logic        csr_mtvt_init;
 
+  // shadow
+  logic                            shadow_en;
+  logic                            shadow_block_lw;
+  logic                            shadow_runahead;
+  logic                            shadow_csr_save;
+  logic [31:0]                     shadow_mepc;
+  logic [$clog2(NUM_INTERRUPTS):0] shadow_mcause;
+
   // HPM related control signals
   logic [31:0] mcounteren;
 
@@ -566,7 +585,8 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .APU_NUSFLAGS_CPU             ( APU_NUSFLAGS_CPU     ),
     .DEBUG_TRIGGER_EN             ( DEBUG_TRIGGER_EN     ),
     .CLIC                         ( CLIC                 ),
-    .NUM_INTERRUPTS               ( NUM_INTERRUPTS       )
+    .NUM_INTERRUPTS               ( NUM_INTERRUPTS       ),
+    .SHADOW                       ( SHADOW               )
   )
   id_stage_i
   (
@@ -779,7 +799,21 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .mhpmevent_pipe_stall_o       ( mhpmevent_pipe_stall ),
 
     .perf_imiss_i                 ( perf_imiss           ),
-    .mcounteren_i                 ( mcounteren           )
+    .mcounteren_i                 ( mcounteren           ),
+
+    // shadow registers
+    .shadow_en_i                  ( shadow_en            ),
+    .shadow_csr_save_i            ( shadow_csr_save      ),
+    .shadow_mepc_i                ( shadow_mepc          ),
+    .shadow_mcause_i              ( shadow_mcause        ),
+    .shadow_req_o                 ( shadow_req_o         ),
+    .shadow_gnt_i                 ( shadow_gnt_i         ),
+    .shadow_rvalid_i              ( shadow_rvalid_i      ),
+    .shadow_we_o                  ( shadow_we_o          ),
+    .shadow_be_o                  ( shadow_be_o          ),
+    .shadow_addr_o                ( shadow_addr_o        ),
+    .shadow_wdata_o               ( shadow_wdata_o       ),
+    .shadow_rdata_i               ( shadow_rdata_i       )
   );
 
 
@@ -1001,7 +1035,8 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .DEBUG_TRIGGER_EN  ( DEBUG_TRIGGER_EN      ),
     .CLIC              ( CLIC                  ),
     .NUM_INTERRUPTS    ( NUM_INTERRUPTS        ),
-    .MCLICBASE_ADDR    ( MCLICBASE_ADDR        )
+    .MCLICBASE_ADDR    ( MCLICBASE_ADDR        ),
+    .SHADOW            ( SHADOW                )
   )
   cs_registers_i
   (
@@ -1080,6 +1115,13 @@ module cv32e40p_core import cv32e40p_apu_core_pkg::*;
     .csr_cause_i                ( csr_cause              ),
     .csr_irq_level_i            ( csr_irq_level          ),
     .csr_save_cause_i           ( csr_save_cause         ),
+
+    .shadow_en_o                ( shadow_en              ),
+    .shadow_block_lw_o          ( shadow_block_lw        ),
+    .shadow_runahead_o          ( shadow_runahead        ),
+    .shadow_csr_save_o          ( shadow_csr_save        ),
+    .shadow_mepc_o              ( shadow_mepc            ),
+    .shadow_mcause_o            ( shadow_mcause          ),
 
     // from hwloop registers
     .hwlp_start_i               ( hwlp_start             ),
