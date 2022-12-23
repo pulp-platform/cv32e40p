@@ -136,7 +136,18 @@ module cv32e40p_tb_subsystem #(
       .debug_halted_o   (),
 
       .fetch_enable_i(fetch_enable_i),
-      .core_sleep_o  (core_sleep_o)
+      .core_sleep_o  (core_sleep_o),
+      // Recovery Ports for RF
+      .recover_i         ( '0 ),
+      // Write Port A
+      .regfile_waddr_a_i ( '0 ),
+      .regfile_wdata_a_i ( '0 ),
+      .regfile_we_a_i    ( '0 ),
+     
+      // Write Port B
+      .regfile_waddr_b_i ( '0 ),
+      .regfile_wdata_b_i ( '0 ),
+      .regfile_we_b_i    ( '0 )
   );
 
 
