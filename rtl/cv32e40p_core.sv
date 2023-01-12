@@ -35,7 +35,8 @@ module cv32e40p_core
     parameter PULP_CLUSTER = 0,  // PULP Cluster interface (incl. p.elw)
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
-    parameter NUM_MHPMCOUNTERS = 1
+    parameter NUM_MHPMCOUNTERS = 1,
+    parameter NUM_EXTERNAL_PERF = 0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -94,7 +95,10 @@ module cv32e40p_core
 
     // CPU Control Signals
     input  logic fetch_enable_i,
-    output logic core_sleep_o
+    output logic core_sleep_o,
+
+    // External performance monitoring signals
+    input logic [NUM_EXTERNAL_PERF-1:0] external_perf_i
 );
 
   import cv32e40p_pkg::*;
@@ -938,6 +942,7 @@ module cv32e40p_core
       .USE_PMP         (USE_PMP),
       .N_PMP_ENTRIES   (N_PMP_ENTRIES),
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
+      .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF),
       .PULP_XPULP      (PULP_XPULP),
       .PULP_CLUSTER    (PULP_CLUSTER),
       .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN)
@@ -1031,7 +1036,8 @@ module cv32e40p_core
       .apu_typeconflict_i      (perf_apu_type),
       .apu_contention_i        (perf_apu_cont),
       .apu_dep_i               (perf_apu_dep),
-      .apu_wb_i                (perf_apu_wb)
+      .apu_wb_i                (perf_apu_wb),
+      .external_perf_i         (external_perf_i)
   );
 
   //  CSR access

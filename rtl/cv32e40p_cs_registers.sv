@@ -39,6 +39,7 @@ module cv32e40p_cs_registers
     parameter USE_PMP          = 0,
     parameter N_PMP_ENTRIES    = 16,
     parameter NUM_MHPMCOUNTERS = 1,
+    parameter NUM_EXTERNAL_PERF = 0,
     parameter PULP_XPULP       = 0,
     parameter PULP_CLUSTER     = 0,
     parameter DEBUG_TRIGGER_EN = 1
@@ -138,10 +139,11 @@ module cv32e40p_cs_registers
     input logic apu_typeconflict_i,
     input logic apu_contention_i,
     input logic apu_dep_i,
-    input logic apu_wb_i
+    input logic apu_wb_i,
+    input logic [NUM_EXTERNAL_PERF-1:0] external_perf_i
 );
 
-  localparam NUM_HPM_EVENTS = 16;
+  localparam NUM_HPM_EVENTS = 16 + NUM_EXTERNAL_PERF;
 
   localparam MTVEC_MODE = 2'b01;
 
@@ -1379,6 +1381,9 @@ module cv32e40p_cs_registers
   assign hpm_events[13] = !APU ? 1'b0 : apu_contention_i;
   assign hpm_events[14] = !APU ? 1'b0 : apu_dep_i && !apu_contention_i;
   assign hpm_events[15] = !APU ? 1'b0 : apu_wb_i;
+  for (genvar i = 0; i < NUM_EXTERNAL_PERF; i++) begin : gen_external_perf
+    assign hpm_events[16+i] = external_perf_i[i];
+  end
 
   // ------------------------
   // address decoder for performance counter registers
