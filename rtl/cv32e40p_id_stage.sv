@@ -231,6 +231,15 @@ module cv32e40p_id_stage
     input logic        regfile_alu_we_fw_i,
     input logic [31:0] regfile_alu_wdata_fw_i,
 
+    // Backup ports to the RF
+    input  logic        regfile_backup_i  ,
+    input  logic [ 5:0] regfile_raddr_ra_i,
+    input  logic [ 5:0] regfile_raddr_rb_i,
+    input  logic [ 5:0] regfile_raddr_rc_i,
+    output logic [31:0] regfile_rdata_ra_o,
+    output logic [31:0] regfile_rdata_rb_o,
+    output logic [31:0] regfile_rdata_rc_o,
+
     // from ALU
     input  logic        mult_multicycle_i,    // when we need multiple cycles in the multiplier and use op c as storage
 
@@ -332,7 +341,8 @@ module cv32e40p_id_stage
   // Register file interface
   logic [ 5:0] regfile_addr_ra_id;
   logic [ 5:0] regfile_addr_rb_id;
-  logic [ 5:0] regfile_addr_rc_id;
+  logic [ 5:0] regfile_addr_rc   ,
+               regfile_addr_rc_id;
 
   logic        regfile_fp_a;
   logic        regfile_fp_b;
@@ -522,19 +532,20 @@ module cv32e40p_id_stage
   //---------------------------------------------------------------------------
   // source register selection regfile_fp_x=1 <=> CV32E40P_REG_x is a FP-register
   //---------------------------------------------------------------------------
-  assign regfile_addr_ra_id = {fregfile_ena & regfile_fp_a, instr[REG_S1_MSB:REG_S1_LSB]};
-  assign regfile_addr_rb_id = {fregfile_ena & regfile_fp_b, instr[REG_S2_MSB:REG_S2_LSB]};
+  assign regfile_addr_ra_id = ( regfile_backup_i ) ? regfile_raddr_ra_i : {fregfile_ena & regfile_fp_a, instr[REG_S1_MSB:REG_S1_LSB]};
+  assign regfile_addr_rb_id = ( regfile_backup_i ) ? regfile_raddr_rb_i : {fregfile_ena & regfile_fp_b, instr[REG_S2_MSB:REG_S2_LSB]};
 
   // register C mux
   always_comb begin
     unique case (regc_mux)
-      REGC_ZERO: regfile_addr_rc_id = '0;
-      REGC_RD:   regfile_addr_rc_id = {fregfile_ena & regfile_fp_c, instr[REG_D_MSB:REG_D_LSB]};
-      REGC_S1:   regfile_addr_rc_id = {fregfile_ena & regfile_fp_c, instr[REG_S1_MSB:REG_S1_LSB]};
-      REGC_S4:   regfile_addr_rc_id = {fregfile_ena & regfile_fp_c, instr[REG_S4_MSB:REG_S4_LSB]};
+      REGC_ZERO: regfile_addr_rc = '0;
+      REGC_RD:   regfile_addr_rc = {fregfile_ena & regfile_fp_c, instr[REG_D_MSB:REG_D_LSB]};
+      REGC_S1:   regfile_addr_rc = {fregfile_ena & regfile_fp_c, instr[REG_S1_MSB:REG_S1_LSB]};
+      REGC_S4:   regfile_addr_rc = {fregfile_ena & regfile_fp_c, instr[REG_S4_MSB:REG_S4_LSB]};
     endcase
-  end
-
+  end // always_comb
+  assign regfile_addr_rc_id = ( regfile_backup_i ) ? regfile_raddr_rc_i : regfile_addr_rc;
+  
   //---------------------------------------------------------------------------
   // destination registers regfile_fp_d=1 <=> REG_D is a FP-register
   //---------------------------------------------------------------------------
@@ -936,7 +947,9 @@ module cv32e40p_id_stage
     .wdata_b_i(regfile_alu_wdata_fw_i),
     .we_b_i   (regfile_alu_we_fw_i)
   );
-
+  assign regfile_rdata_ra_o = regfile_data_ra_id;
+  assign regfile_rdata_rb_o = regfile_data_rb_id;
+  assign regfile_rdata_rc_o = regfile_data_rc_id;
 
   ///////////////////////////////////////////////
   //  ____  _____ ____ ___  ____  _____ ____   //

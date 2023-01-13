@@ -30,18 +30,19 @@
 module cv32e40p_cs_registers
   import cv32e40p_pkg::*;
 #(
-    parameter N_HWLP           = 2,
-    parameter N_HWLP_BITS      = $clog2(N_HWLP),
-    parameter APU              = 0,
-    parameter A_EXTENSION      = 0,
-    parameter FPU              = 0,
-    parameter PULP_SECURE      = 0,
-    parameter USE_PMP          = 0,
-    parameter N_PMP_ENTRIES    = 16,
-    parameter NUM_MHPMCOUNTERS = 1,
-    parameter PULP_XPULP       = 0,
-    parameter PULP_CLUSTER     = 0,
-    parameter DEBUG_TRIGGER_EN = 1
+    parameter N_HWLP             = 2,
+    parameter N_HWLP_BITS        = $clog2(N_HWLP),
+    parameter APU                = 0,
+    parameter A_EXTENSION        = 0,
+    parameter FPU                = 0,
+    parameter PULP_SECURE        = 0,
+    parameter USE_PMP            = 0,
+    parameter N_PMP_ENTRIES      = 16,
+    parameter NUM_MHPMCOUNTERS   = 1,
+    parameter PULP_XPULP         = 0,
+    parameter PULP_CLUSTER       = 0,
+    parameter DEBUG_TRIGGER_EN   = 1,
+    parameter NUM_EXT_PERF_CNTRS = 0
 ) (
     // Clock and Reset
     input logic clk,
@@ -138,10 +139,11 @@ module cv32e40p_cs_registers
     input logic apu_typeconflict_i,
     input logic apu_contention_i,
     input logic apu_dep_i,
-    input logic apu_wb_i
+    input logic apu_wb_i,
+    input logic [NUM_EXT_PERF_CNTRS-1:0] ext_perf_cntrs_i
 );
 
-  localparam NUM_HPM_EVENTS = 16;
+  localparam NUM_HPM_EVENTS = 16 + NUM_EXT_PERF_CNTRS;
 
   localparam MTVEC_MODE = 2'b01;
 
@@ -1379,6 +1381,11 @@ module cv32e40p_cs_registers
   assign hpm_events[13] = !APU ? 1'b0 : apu_contention_i;
   assign hpm_events[14] = !APU ? 1'b0 : apu_dep_i && !apu_contention_i;
   assign hpm_events[15] = !APU ? 1'b0 : apu_wb_i;
+  generate
+    for (genvar index = 0; index < NUM_EXT_PERF_CNTRS; index++) begin : gen_ext_perf_cntrs
+      assign hpm_events [16 + index] = ext_perf_cntrs_i [index];
+    end
+  endgenerate
 
   // ------------------------
   // address decoder for performance counter registers

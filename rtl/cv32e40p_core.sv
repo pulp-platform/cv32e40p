@@ -35,7 +35,8 @@ module cv32e40p_core
     parameter PULP_CLUSTER = 0,  // PULP Cluster interface (incl. p.elw)
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
-    parameter NUM_MHPMCOUNTERS = 1
+    parameter NUM_MHPMCOUNTERS = 1,
+    parameter NUM_EXT_PERF_CNTRS = 0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -105,7 +106,17 @@ module cv32e40p_core
     // Write Port B
     input logic [5:0]  regfile_waddr_b_i,
     input logic [31:0] regfile_wdata_b_i,
-    input logic        regfile_we_b_i
+    input logic        regfile_we_b_i   ,
+    // Backup ports to the RF
+    input  logic        regfile_backup_i  ,
+    input  logic [ 5:0] regfile_raddr_ra_i,
+    input  logic [ 5:0] regfile_raddr_rb_i,
+    input  logic [ 5:0] regfile_raddr_rc_i, 
+    output logic [31:0] regfile_rdata_ra_o,
+    output logic [31:0] regfile_rdata_rb_o,
+    output logic [31:0] regfile_rdata_rc_o,
+    // External Performece Counters
+    input  logic [NUM_EXT_PERF_CNTRS-1:0] ext_perf_cntrs_i
 );
 
   import cv32e40p_pkg::*;
@@ -737,6 +748,15 @@ module cv32e40p_core
       .regfile_alu_we_fw_i   (regfile_we_b),
       .regfile_alu_wdata_fw_i(regfile_wdata_b),
 
+      // Backup ports to the RF
+      .regfile_backup_i   ( regfile_backup_i   ),
+      .regfile_raddr_ra_i ( regfile_raddr_ra_i ),
+      .regfile_raddr_rb_i ( regfile_raddr_rb_i ),
+      .regfile_raddr_rc_i ( regfile_raddr_rc_i ),
+      .regfile_rdata_ra_o ( regfile_rdata_ra_o ),
+      .regfile_rdata_rb_o ( regfile_rdata_rb_o ),
+      .regfile_rdata_rc_o ( regfile_rdata_rc_o ),
+
       // from ALU
       .mult_multicycle_i(mult_multicycle),
 
@@ -861,7 +881,7 @@ module cv32e40p_core
       .regfile_we_i   (regfile_we_ex),
 
       // Output of ex stage pipeline
-      .regfile_waddr_wb_o(regfile_waddr_fw_wb_o),
+      .regfile_waddr_wb_o(regfile_waddr_fw_wb_o), // Regfile A port 
       .regfile_we_wb_o   (regfile_we_wb),
       .regfile_wdata_wb_o(regfile_wdata),
 
@@ -870,7 +890,7 @@ module cv32e40p_core
       .branch_decision_o(branch_decision),
 
       // To ID stage: Forwarding signals
-      .regfile_alu_waddr_fw_o(regfile_alu_waddr_fw),
+      .regfile_alu_waddr_fw_o(regfile_alu_waddr_fw), // Regfile B port
       .regfile_alu_we_fw_o   (regfile_alu_we_fw),
       .regfile_alu_wdata_fw_o(regfile_alu_wdata_fw),
 
@@ -964,6 +984,7 @@ module cv32e40p_core
       .USE_PMP         (USE_PMP),
       .N_PMP_ENTRIES   (N_PMP_ENTRIES),
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
+      .NUM_EXT_PERF_CNTRS(NUM_EXT_PERF_CNTRS),
       .PULP_XPULP      (PULP_XPULP),
       .PULP_CLUSTER    (PULP_CLUSTER),
       .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN)
@@ -1057,7 +1078,9 @@ module cv32e40p_core
       .apu_typeconflict_i      (perf_apu_type),
       .apu_contention_i        (perf_apu_cont),
       .apu_dep_i               (perf_apu_dep),
-      .apu_wb_i                (perf_apu_wb)
+      .apu_wb_i                (perf_apu_wb),
+      // External Performece Counters
+      .ext_perf_cntrs_i        (ext_perf_cntrs_i)
   );
 
   //  CSR access

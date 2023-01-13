@@ -32,7 +32,8 @@ module cv32e40p_wrapper
     parameter PULP_CLUSTER = 0,  // PULP Cluster interface (incl. p.elw)
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
-    parameter NUM_MHPMCOUNTERS = 1
+    parameter NUM_MHPMCOUNTERS = 1,
+    parameter NUM_EXT_PERF_CNTRS = 0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -102,7 +103,17 @@ module cv32e40p_wrapper
     // Write Port B
     input logic [5:0]  regfile_waddr_b_i,
     input logic [31:0] regfile_wdata_b_i,
-    input logic        regfile_we_b_i
+    input logic        regfile_we_b_i   ,
+    // Backup ports to the RF
+    input  logic        regfile_backup_i  ,
+    input  logic [ 5:0] regfile_raddr_ra_i,
+    input  logic [ 5:0] regfile_raddr_rb_i,
+    input  logic [ 5:0] regfile_raddr_rc_i,
+    output logic [31:0] regfile_rdata_ra_o,
+    output logic [31:0] regfile_rdata_rb_o,
+    output logic [31:0] regfile_rdata_rc_o,
+    // External Performece Counters
+    input  logic [NUM_EXT_PERF_CNTRS-1:0] ext_perf_cntrs_i
 );
 
 `ifdef CV32E40P_ASSERT_ON
@@ -222,7 +233,8 @@ module cv32e40p_wrapper
       .PULP_CLUSTER    (PULP_CLUSTER),
       .FPU             (FPU),
       .PULP_ZFINX      (PULP_ZFINX),
-      .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS)
+      .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
+      .NUM_EXT_PERF_CNTRS(NUM_EXT_PERF_CNTRS)
   ) core_i (
       .*
   );
