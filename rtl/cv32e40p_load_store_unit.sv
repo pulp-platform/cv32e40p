@@ -28,6 +28,7 @@ module cv32e40p_load_store_unit #(
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // output to data memory
     output logic data_req_o,
@@ -188,14 +189,20 @@ module cv32e40p_load_store_unit #(
       data_sign_ext_q   <= '0;
       data_we_q         <= 1'b0;
       data_load_event_q <= 1'b0;
-    end
-    else if (ctrl_update) // request was granted, we wait for rvalid and can continue to WB
-    begin
-      data_type_q       <= data_type_ex_i;
-      rdata_offset_q    <= data_addr_int[1:0];
-      data_sign_ext_q   <= data_sign_ext_ex_i;
-      data_we_q         <= data_we_ex_i;
-      data_load_event_q <= data_load_event_ex_i;
+    end else if (ctrl_update) begin // request was granted, we wait for rvalid and can continue to WB
+      if (setback_i) begin
+        data_type_q       <= '0;
+        rdata_offset_q    <= '0;
+        data_sign_ext_q   <= '0;
+        data_we_q         <= 1'b0;
+        data_load_event_q <= 1'b0;
+      end else begin
+        data_type_q       <= data_type_ex_i;
+        rdata_offset_q    <= data_addr_int[1:0];
+        data_sign_ext_q   <= data_sign_ext_ex_i;
+        data_we_q         <= data_we_ex_i;
+        data_load_event_q <= data_load_event_ex_i;
+      end
     end
   end
 
@@ -300,7 +307,9 @@ module cv32e40p_load_store_unit #(
     if (rst_n == 1'b0) begin
       rdata_q <= '0;
     end else begin
-      if (resp_valid && (~data_we_q)) begin
+      if (setback_i) begin
+        rdata_q <= '0;
+      end else if (resp_valid && (~data_we_q)) begin
         // if we have detected a misaligned access, and we are
         // currently doing the first part of this access, then
         // store the data coming from memory in rdata_q.
@@ -443,7 +452,11 @@ module cv32e40p_load_store_unit #(
     if (rst_n == 1'b0) begin
       cnt_q <= '0;
     end else begin
-      cnt_q <= next_cnt;
+      if (setback_i) begin
+        cnt_q <= '0;
+      end else begin
+        cnt_q <= next_cnt;
+      end
     end
   end
 
@@ -457,6 +470,7 @@ module cv32e40p_load_store_unit #(
   ) data_obi_i (
       .clk  (clk),
       .rst_n(rst_n),
+      .setback_i(setback_i),
 
       .trans_valid_i(trans_valid),
       .trans_ready_o(trans_ready),

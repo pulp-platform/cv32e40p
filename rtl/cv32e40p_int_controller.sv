@@ -28,6 +28,7 @@ module cv32e40p_int_controller
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // External interrupt lines
     input logic [31:0] irq_i,  // Level-triggered interrupt inputs
@@ -61,8 +62,13 @@ module cv32e40p_int_controller
       irq_q     <= '0;
       irq_sec_q <= 1'b0;
     end else begin
-      irq_q     <= irq_i & IRQ_MASK;
-      irq_sec_q <= irq_sec_i;
+      if (setback_i) begin
+        irq_q     <= '0;
+        irq_sec_q <= 1'b0;
+      end else begin
+        irq_q     <= irq_i & IRQ_MASK;
+        irq_sec_q <= irq_sec_i;
+      end
     end
   end
 

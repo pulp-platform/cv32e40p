@@ -36,6 +36,7 @@ module cv32e40p_register_file #(
     // Clock and Reset
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     input logic scan_cg_en_i,
 
@@ -138,8 +139,12 @@ module cv32e40p_register_file #(
         if (rst_n == 1'b0) begin
           mem[i] <= 32'b0;
         end else begin
-          if (we_b_dec[i] == 1'b1) mem[i] <= wdata_b_i;
-          else if (we_a_dec[i] == 1'b1) mem[i] <= wdata_a_i;
+          if (setback_i) begin
+            mem[i] <= 32'b0;
+          end else begin
+            if (we_b_dec[i] == 1'b1) mem[i] <= wdata_b_i;
+            else if (we_a_dec[i] == 1'b1) mem[i] <= wdata_a_i;
+          end
         end
       end
 
@@ -149,9 +154,16 @@ module cv32e40p_register_file #(
       // Floating point registers
       for (l = 0; l < NUM_FP_WORDS; l++) begin
         always_ff @(posedge clk, negedge rst_n) begin : fp_regs
-          if (rst_n == 1'b0) mem_fp[l] <= '0;
-          else if (we_b_dec[l+NUM_WORDS] == 1'b1) mem_fp[l] <= wdata_b_i;
-          else if (we_a_dec[l+NUM_WORDS] == 1'b1) mem_fp[l] <= wdata_a_i;
+          if (rst_n == 1'b0) begin
+            mem_fp[l] <= '0;
+          end else begin
+            if (setback_i) begin
+              mem_fp[l] <= '0;
+            end else begin
+              if (we_b_dec[l+NUM_WORDS] == 1'b1) mem_fp[l] <= wdata_b_i;
+              else if (we_a_dec[l+NUM_WORDS] == 1'b1) mem_fp[l] <= wdata_a_i;
+            end
+          end
         end
       end
     end else begin : gen_no_mem_fp_write
