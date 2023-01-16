@@ -21,6 +21,7 @@ module cv32e40p_fifo #(
 ) (
     input logic clk_i,  // Clock
     input logic rst_ni,  // Asynchronous reset active low
+    input logic setback_i,
     input logic flush_i,  // flush the queue
     input logic flush_but_first_i,  // flush the queue except the first instruction
     input logic testmode_i,  // test_mode to bypass clock gating
@@ -114,34 +115,46 @@ module cv32e40p_fifo #(
       write_pointer_q <= '0;
       status_cnt_q    <= '0;
     end else begin
-      unique case (1'b1)
-        // Flush the FIFO
-        flush_i: begin
-          read_pointer_q  <= '0;
-          write_pointer_q <= '0;
-          status_cnt_q    <= '0;
-        end
-        // Flush the FIFO but keep the first instruction alive if present
-        flush_but_first_i: begin
-          read_pointer_q  <= (status_cnt_q > 0) ? read_pointer_q : '0;
-          write_pointer_q <= (status_cnt_q > 0) ? read_pointer_q + 1 : '0;
-          status_cnt_q    <= (status_cnt_q > 0) ? 1'b1 : '0;
-        end
-        // If we are not flushing, update the pointers
-        default: begin
-          read_pointer_q  <= read_pointer_n;
-          write_pointer_q <= write_pointer_n;
-          status_cnt_q    <= status_cnt_n;
-        end
-      endcase
+      if (setback_i) begin
+        read_pointer_q  <= '0;
+        write_pointer_q <= '0;
+        status_cnt_q    <= '0;
+      end else begin
+        unique case (1'b1)
+          // Flush the FIFO
+          flush_i: begin
+            read_pointer_q  <= '0;
+            write_pointer_q <= '0;
+            status_cnt_q    <= '0;
+          end
+          // Flush the FIFO but keep the first instruction alive if present
+          flush_but_first_i: begin
+            read_pointer_q  <= (status_cnt_q > 0) ? read_pointer_q : '0;
+            write_pointer_q <= (status_cnt_q > 0) ? read_pointer_q + 1 : '0;
+            status_cnt_q    <= (status_cnt_q > 0) ? 1'b1 : '0;
+          end
+          // If we are not flushing, update the pointers
+          default: begin
+            read_pointer_q  <= read_pointer_n;
+            write_pointer_q <= write_pointer_n;
+            status_cnt_q    <= status_cnt_n;
+          end
+        endcase
+      end
     end
   end
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (~rst_ni) begin
       mem_q <= '0;
-    end else if (!gate_clock) begin
-      mem_q <= mem_n;
+    end else begin
+      if (setback_i) begin
+        mem_q <= '0;
+      end else begin
+        if (!gate_clock) begin
+          mem_q <= mem_n;
+        end
+      end
     end
   end
 

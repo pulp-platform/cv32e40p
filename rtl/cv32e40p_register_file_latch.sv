@@ -38,6 +38,7 @@ module cv32e40p_register_file #(
     // Clock and Reset
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     input logic scan_cg_en_i,
 
@@ -126,11 +127,17 @@ module cv32e40p_register_file #(
       wdata_b_q        <= '0;
       waddr_onehot_b_q <= '0;
     end else begin
-      if (we_a_i) wdata_a_q <= wdata_a_i;
+      if (setback_i) begin
+        wdata_a_q        <= '0;
+        wdata_b_q        <= '0;
+        waddr_onehot_b_q <= '0;
+      end else begin
+        if (we_a_i) wdata_a_q <= wdata_a_i;
 
-      if (we_b_i) wdata_b_q <= wdata_b_i;
+        if (we_b_i) wdata_b_q <= wdata_b_i;
 
-      waddr_onehot_b_q <= waddr_onehot_b;
+        waddr_onehot_b_q <= waddr_onehot_b;
+      end
     end
   end
 
@@ -178,8 +185,15 @@ module cv32e40p_register_file #(
     mem[0] = '0;
 
     for (k = 1; k < NUM_WORDS; k++) begin : w_WordIter
-      if (~rst_n) mem[k] = '0;
-      else if (mem_clocks[k] == 1'b1) mem[k] = waddr_onehot_b_q[k] ? wdata_b_q : wdata_a_q;
+      if (~rst_n) begin
+        mem[k] = '0;
+      end else begin
+        if (setback_i) begin
+          mem[k] = '0;
+        end else begin
+          if (mem_clocks[k] == 1'b1) mem[k] = waddr_onehot_b_q[k] ? wdata_b_q : wdata_a_q;
+        end
+      end
     end
   end
 
@@ -188,9 +202,16 @@ module cv32e40p_register_file #(
     always_latch begin : latch_wdata_fp
       if (FPU == 1) begin
         for (l = 0; l < NUM_FP_WORDS; l++) begin : w_WordIter
-          if (~rst_n) mem_fp[l] = '0;
-          else if (mem_clocks[l+NUM_WORDS] == 1'b1)
-            mem_fp[l] = waddr_onehot_b_q[l+NUM_WORDS] ? wdata_b_q : wdata_a_q;
+          if (~rst_n) begin
+            mem_fp[l] = '0;
+          end else begin
+            if (setback_i) begin
+              mem_fp[l] = '0;
+            end else begin
+              if (mem_clocks[l+NUM_WORDS] == 1'b1)
+                mem_fp[l] = waddr_onehot_b_q[l+NUM_WORDS] ? wdata_b_q : wdata_a_q;
+            end
+          end
         end
       end
     end

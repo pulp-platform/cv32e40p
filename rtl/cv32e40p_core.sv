@@ -41,6 +41,7 @@ module cv32e40p_core
     // Clock and Reset
     input logic clk_i,
     input logic rst_ni,
+    input logic setback_i,
 
     input logic pulp_clock_en_i,  // PULP clock enable (only used if PULP_CLUSTER = 1)
     input logic scan_cg_en_i,  // Enable all clock gates for testing
@@ -417,6 +418,7 @@ module cv32e40p_core
       // Clock, reset interface
       .clk_ungated_i(clk_i),  // Ungated clock
       .rst_n        (rst_ni),
+      .setback_i    (setback_i),
       .clk_gated_o  (clk),  // Gated clock
       .scan_cg_en_i (scan_cg_en_i),
 
@@ -460,6 +462,7 @@ module cv32e40p_core
   ) if_stage_i (
       .clk  (clk),
       .rst_n(rst_ni),
+      .setback_i          (setback_i),
 
       // boot address
       .boot_addr_i        (boot_addr_i[31:0]),
@@ -580,6 +583,7 @@ module cv32e40p_core
       .clk          (clk),  // Gated clock
       .clk_ungated_i(clk_i),  // Ungated clock
       .rst_n        (rst_ni),
+      .setback_i    (setback_i),
 
       .scan_cg_en_i(scan_cg_en_i),
 
@@ -813,6 +817,7 @@ module cv32e40p_core
       // Global signals: Clock and active low asynchronous reset
       .clk  (clk),
       .rst_n(rst_ni),
+      .setback_i(setback_i),
 
       // Alu signals from ID stage
       .alu_en_i        (alu_en_ex),
@@ -936,6 +941,7 @@ module cv32e40p_core
   ) load_store_unit_i (
       .clk  (clk),
       .rst_n(rst_ni),
+      .setback_i(setback_i),
 
       //output to data memory
       .data_req_o    (data_req_pmp),
@@ -1008,6 +1014,7 @@ module cv32e40p_core
   ) cs_registers_i (
       .clk  (clk),
       .rst_n(rst_ni),
+      .setback_i(setback_i),
 
       // Hart ID from outside
       .hart_id_i       (hart_id_i),
@@ -1125,6 +1132,7 @@ module cv32e40p_core
       ) pmp_unit_i (
           .clk  (clk),
           .rst_n(rst_ni),
+          // Where is the PMP stored?
 
           .pmp_privil_mode_i(current_priv_lvl),
 

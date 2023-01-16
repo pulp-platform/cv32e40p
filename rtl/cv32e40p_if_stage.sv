@@ -33,6 +33,7 @@ module cv32e40p_if_stage #(
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // Used to calculate the exception offsets
     input logic [23:0] m_trap_base_addr_i,
@@ -181,6 +182,7 @@ module cv32e40p_if_stage #(
   ) prefetch_buffer_i (
       .clk  (clk),
       .rst_n(rst_n),
+      .setback_i(setback_i),
 
       .req_i(req_i),
 
@@ -235,8 +237,14 @@ module cv32e40p_if_stage #(
       is_compressed_id_o  <= 1'b0;
       illegal_c_insn_id_o <= 1'b0;
     end else begin
-
-      if (if_valid && instr_valid) begin
+      if (setback_i) begin
+        instr_valid_id_o    <= 1'b0;
+        instr_rdata_id_o    <= '0;
+        is_fetch_failed_o   <= 1'b0;
+        pc_id_o             <= '0;
+        is_compressed_id_o  <= 1'b0;
+        illegal_c_insn_id_o <= 1'b0;
+      end else if (if_valid && instr_valid) begin
         instr_valid_id_o    <= 1'b1;
         instr_rdata_id_o    <= instr_decompressed;
         is_compressed_id_o  <= instr_compressed_int;
@@ -256,6 +264,7 @@ module cv32e40p_if_stage #(
   cv32e40p_aligner aligner_i (
       .clk             (clk),
       .rst_n           (rst_n),
+      .setback_i       (setback_i),
       .fetch_valid_i   (fetch_valid),
       .aligner_ready_o (aligner_ready),
       .if_valid_i      (if_valid),

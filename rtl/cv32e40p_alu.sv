@@ -30,6 +30,7 @@ module cv32e40p_alu
 (
     input logic               clk,
     input logic               rst_n,
+    input logic               setback_i,
     input logic               enable_i,
     input alu_opcode_e        operator_i,
     input logic        [31:0] operand_a_i,
@@ -898,6 +899,7 @@ module cv32e40p_alu
   cv32e40p_alu_div alu_div_i (
       .Clk_CI (clk),
       .Rst_RBI(rst_n),
+      .setback_i(setback_i),
 
       // input IF
       .OpA_DI      (operand_b_i),

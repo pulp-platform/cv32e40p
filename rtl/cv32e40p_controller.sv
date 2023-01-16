@@ -37,6 +37,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
   input  logic        clk,                        // Gated clock
   input  logic        clk_ungated_i,              // Ungated clock
   input  logic        rst_n,
+  input  logic        setback_i,
 
   input  logic        fetch_enable_i,             // Start the decoding
   input  logic        debug_resume_i,
@@ -1262,7 +1263,11 @@ generate
       if(!rst_n) begin
         hwlp_end_4_id_q <= 1'b0;
       end else begin
-        hwlp_end_4_id_q <= hwlp_end_4_id_d;
+        if (setback_i) begin
+          hwlp_end_4_id_q <= 1'b0;
+        end else begin
+          hwlp_end_4_id_q <= hwlp_end_4_id_d;
+        end
       end
     end
 
@@ -1398,10 +1403,8 @@ endgenerate
   end
 
   // update registers
-  always_ff @(posedge clk , negedge rst_n)
-  begin : UPDATE_REGS
-    if ( rst_n == 1'b0 )
-    begin
+  always_ff @(posedge clk , negedge rst_n) begin : UPDATE_REGS
+    if ( rst_n == 1'b0 ) begin
       ctrl_fsm_cs        <= RESET;
       jump_done_q        <= 1'b0;
       data_err_q         <= 1'b0;
@@ -1411,22 +1414,31 @@ endgenerate
 
       debug_req_entry_q  <= 1'b0;
       debug_force_wakeup_q <= 1'b0;
-    end
-    else
-    begin
-      ctrl_fsm_cs        <= ctrl_fsm_ns;
+    end else begin
+      if (setback_i) begin
+        ctrl_fsm_cs        <= RESET;
+        jump_done_q        <= 1'b0;
+        data_err_q         <= 1'b0;
 
-      // clear when id is valid (no instruction incoming)
-      jump_done_q        <= jump_done & (~id_ready_i);
+        debug_mode_q       <= 1'b0;
+        illegal_insn_q     <= 1'b0;
 
-      data_err_q         <= data_err_i;
+        debug_req_entry_q  <= 1'b0;
+        debug_force_wakeup_q <= 1'b0;
+      end else begin
+        ctrl_fsm_cs        <= ctrl_fsm_ns;
 
-      debug_mode_q       <= (debug_resume_i) ? 1'b0 : debug_mode_n;
+        jump_done_q        <= jump_done & (~id_ready_i);
 
-      illegal_insn_q     <= illegal_insn_n;
+        data_err_q         <= data_err_i;
 
-      debug_req_entry_q  <= debug_req_entry_n;
-      debug_force_wakeup_q <= debug_force_wakeup_n;
+        debug_mode_q       <= (debug_resume_i) ? 1'b0 : debug_mode_n;
+
+        illegal_insn_q     <= illegal_insn_n;
+
+        debug_req_entry_q  <= debug_req_entry_n;
+        debug_force_wakeup_q <= debug_force_wakeup_n;
+      end
     end
   end
 
@@ -1451,25 +1463,31 @@ endgenerate
   assign wfi_active = wfi_i & ~debug_wfi_no_sleep_o;
 
   // sticky version of debug_req (must be on clk_ungated_i such that incoming pulse before core is enabled is not missed)
-  always_ff @(posedge clk_ungated_i, negedge rst_n)
-    if ( !rst_n )
+  always_ff @(posedge clk_ungated_i, negedge rst_n) begin
+    if ( !rst_n ) begin
       debug_req_q <= 1'b0;
-    else
-      if( debug_req_i )
-        debug_req_q <= 1'b1;
-      else if( debug_mode_q )
+    end else begin
+      if (setback_i) begin
         debug_req_q <= 1'b0;
+      end else begin
+        if( debug_req_i )
+          debug_req_q <= 1'b1;
+        else if( debug_mode_q )
+          debug_req_q <= 1'b0;
+      end
+    end
+  end
 
   // Debug state FSM
-  always_ff @(posedge clk , negedge rst_n)
-  begin
-    if ( rst_n == 1'b0 )
-    begin
+  always_ff @(posedge clk , negedge rst_n) begin
+    if ( rst_n == 1'b0 ) begin
       debug_fsm_cs <= HAVERESET;
-    end
-    else
-    begin
-      debug_fsm_cs <= debug_fsm_ns;
+    end else begin
+      if (setback_i) begin
+        debug_fsm_cs <= HAVERESET;
+      end else begin
+        debug_fsm_cs <= debug_fsm_ns;
+      end
     end
   end
 

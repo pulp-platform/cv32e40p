@@ -45,6 +45,7 @@ module cv32e40p_prefetch_controller #(
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // Fetch stage interface
     input  logic        req_i,  // Fetch stage requests instructions
@@ -274,7 +275,10 @@ module cv32e40p_prefetch_controller #(
           hwlp_flush_after_resp    <= 1'b0;
           hwlp_flush_cnt_delayed_q <= 2'b00;
         end else begin
-          if (branch_i) begin
+          if (setback_i) begin
+            hwlp_flush_after_resp    <= 1'b0;
+            hwlp_flush_cnt_delayed_q <= 2'b00;
+          end else if (branch_i) begin
             // Reset the flush request if an interrupt is taken
             hwlp_flush_after_resp    <= 1'b0;
             hwlp_flush_cnt_delayed_q <= 2'b00;
@@ -351,11 +355,18 @@ module cv32e40p_prefetch_controller #(
       flush_cnt_q  <= '0;
       trans_addr_q <= '0;
     end else begin
-      state_q     <= next_state;
-      cnt_q       <= next_cnt;
-      flush_cnt_q <= next_flush_cnt;
-      if (branch_i || hwlp_jump_i || (trans_valid_o && trans_ready_i)) begin
-        trans_addr_q <= trans_addr_o;
+      if (setback_i) begin
+        state_q      <= IDLE;
+        cnt_q        <= '0;
+        flush_cnt_q  <= '0;
+        trans_addr_q <= '0;
+      end else begin
+        state_q     <= next_state;
+        cnt_q       <= next_cnt;
+        flush_cnt_q <= next_flush_cnt;
+        if (branch_i || hwlp_jump_i || (trans_valid_o && trans_ready_i)) begin
+          trans_addr_q <= trans_addr_o;
+        end
       end
     end
   end

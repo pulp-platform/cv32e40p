@@ -41,6 +41,7 @@ module cv32e40p_ex_stage
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // ALU signals from ID stage
     input alu_opcode_e        alu_operator_i,
@@ -238,6 +239,7 @@ module cv32e40p_ex_stage
   cv32e40p_alu alu_i (
       .clk        (clk),
       .rst_n      (rst_n),
+      .setback_i  (setback_i),
       .enable_i   (alu_en_i),
       .operator_i (alu_operator_i),
       .operand_a_i(alu_operand_a_i),
@@ -273,6 +275,7 @@ module cv32e40p_ex_stage
   cv32e40p_mult mult_i (
       .clk  (clk),
       .rst_n(rst_n),
+      .setback_i(setback_i),
 
       .enable_i  (mult_en_i),
       .operator_i(mult_operator_i),
@@ -314,6 +317,7 @@ module cv32e40p_ex_stage
       cv32e40p_apu_disp apu_disp_i (
           .clk_i (clk),
           .rst_ni(rst_n),
+          .setback_i(setback_i),
 
           .enable_i   (apu_en_i),
           .apu_lat_i  (apu_lat_i),
@@ -392,16 +396,20 @@ module cv32e40p_ex_stage
       regfile_waddr_lsu <= '0;
       regfile_we_lsu    <= 1'b0;
     end else begin
-      if (ex_valid_o) // wb_ready_i is implied
-      begin
-        regfile_we_lsu <= regfile_we_i & ~lsu_err_i;
-        if (regfile_we_i & ~lsu_err_i) begin
-          regfile_waddr_lsu <= regfile_waddr_i;
+      if (setback_i) begin
+        regfile_waddr_lsu <= '0;
+        regfile_we_lsu    <= 1'b0;
+      end else begin
+        if (ex_valid_o) begin // wb_ready_i is implied
+          regfile_we_lsu <= regfile_we_i & ~lsu_err_i;
+          if (regfile_we_i & ~lsu_err_i) begin
+            regfile_waddr_lsu <= regfile_waddr_i;
+          end
+        end else if (wb_ready_i) begin
+          // we are ready for a new instruction, but there is none available,
+          // so we just flush the current one out of the pipe
+          regfile_we_lsu <= 1'b0;
         end
-      end else if (wb_ready_i) begin
-        // we are ready for a new instruction, but there is none available,
-        // so we just flush the current one out of the pipe
-        regfile_we_lsu <= 1'b0;
       end
     end
   end

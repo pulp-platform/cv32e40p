@@ -29,6 +29,7 @@ module cv32e40p_alu_div #(
 ) (
     input  logic                   Clk_CI,
     input  logic                   Rst_RBI,
+    input  logic                   setback_i,
     // input IF
     input  logic [    C_WIDTH-1:0] OpA_DI,
     input  logic [    C_WIDTH-1:0] OpB_DI,
@@ -201,14 +202,25 @@ module cv32e40p_alu_div #(
       CompInv_SP <= 1'b0;
       ResInv_SP  <= 1'b0;
     end else begin
-      State_SP   <= State_SN;
-      AReg_DP    <= AReg_DN;
-      BReg_DP    <= BReg_DN;
-      ResReg_DP  <= ResReg_DN;
-      Cnt_DP     <= Cnt_DN;
-      RemSel_SP  <= RemSel_SN;
-      CompInv_SP <= CompInv_SN;
-      ResInv_SP  <= ResInv_SN;
+      if (setback_i) begin
+        State_SP   <= IDLE;
+        AReg_DP    <= '0;
+        BReg_DP    <= '0;
+        ResReg_DP  <= '0;
+        Cnt_DP     <= '0;
+        RemSel_SP  <= 1'b0;
+        CompInv_SP <= 1'b0;
+        ResInv_SP  <= 1'b0;
+      end else begin
+        State_SP   <= State_SN;
+        AReg_DP    <= AReg_DN;
+        BReg_DP    <= BReg_DN;
+        ResReg_DP  <= ResReg_DN;
+        Cnt_DP     <= Cnt_DN;
+        RemSel_SP  <= RemSel_SN;
+        CompInv_SP <= CompInv_SN;
+        ResInv_SP  <= ResInv_SN;
+      end
     end
   end
 

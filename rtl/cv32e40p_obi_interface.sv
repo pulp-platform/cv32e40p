@@ -40,6 +40,7 @@ module cv32e40p_obi_interface #(
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // Transaction request interface
     input logic trans_valid_i,
@@ -183,14 +184,23 @@ module cv32e40p_obi_interface #(
           obi_wdata_q <= 32'b0;
           obi_atop_q  <= 6'b0;
         end else begin
-          state_q <= next_state;
-          if ((state_q == TRANSPARENT) && (next_state == REGISTERED)) begin
-            // Keep OBI A channel signals stable throughout REGISTERED state
-            obi_addr_q  <= obi_addr_o;
-            obi_we_q    <= obi_we_o;
-            obi_be_q    <= obi_be_o;
-            obi_wdata_q <= obi_wdata_o;
-            obi_atop_q  <= obi_atop_o;
+          if (setback_i) begin
+            state_q     <= TRANSPARENT;
+            obi_addr_q  <= 32'b0;
+            obi_we_q    <= 1'b0;
+            obi_be_q    <= 4'b0;
+            obi_wdata_q <= 32'b0;
+            obi_atop_q  <= 6'b0;
+          end else begin
+            state_q <= next_state;
+            if ((state_q == TRANSPARENT) && (next_state == REGISTERED)) begin
+              // Keep OBI A channel signals stable throughout REGISTERED state
+              obi_addr_q  <= obi_addr_o;
+              obi_we_q    <= obi_we_o;
+              obi_be_q    <= obi_be_o;
+              obi_wdata_q <= obi_wdata_o;
+              obi_atop_q  <= obi_atop_o;
+            end
           end
         end
       end

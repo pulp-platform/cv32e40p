@@ -50,6 +50,7 @@ module cv32e40p_id_stage
     input logic clk,  // Gated clock
     input logic clk_ungated_i,  // Ungated clock
     input logic rst_n,
+    input logic setback_i,
 
     input logic scan_cg_en_i,
 
@@ -921,8 +922,10 @@ module cv32e40p_id_stage
     .FPU          ( FPU        ),
     .PULP_ZFINX   ( PULP_ZFINX )
   ) register_file_i (
+
     .clk  (clk),
     .rst_n(rst_n),
+    .setback_i(setback_i),
 
     .scan_cg_en_i(scan_cg_en_i),
 
@@ -1102,6 +1105,7 @@ module cv32e40p_id_stage
       .clk          (clk),  // Gated clock
       .clk_ungated_i(clk_ungated_i),  // Ungated clock
       .rst_n        (rst_n),
+      .setback_i    (setback_i),
 
       .fetch_enable_i   (fetch_enable_i),
       .debug_resume_i   (debug_resume_i),
@@ -1282,6 +1286,7 @@ module cv32e40p_id_stage
   ) int_controller_i (
       .clk  (clk),
       .rst_n(rst_n),
+      .setback_i(setback_i),
 
       // External interrupt lines
       .irq_i    (irq_i),
@@ -1319,6 +1324,7 @@ module cv32e40p_id_stage
       ) hwloop_regs_i (
           .clk  (clk),
           .rst_n(rst_n),
+          .setback_i(setback_i),
 
           // from ID
           .hwlp_start_data_i(hwlp_start),
@@ -1482,140 +1488,207 @@ module cv32e40p_id_stage
 
       branch_in_ex_o         <= 1'b0;
 
-    end else if (data_misaligned_i) begin
-      // misaligned data access case
-      if (ex_ready_i) begin  // misaligned access case, only unstall alu operands
-
-        // if we are using post increments, then we have to use the
-        // original value of the register for the second memory access
-        // => keep it stalled
-        if (prepost_useincr_ex_o == 1'b1) begin
-          alu_operand_a_ex_o <= operand_a_fw_id;
-        end
-
-        alu_operand_b_ex_o   <= 32'h4;
-        regfile_alu_we_ex_o  <= 1'b0;
-        prepost_useincr_ex_o <= 1'b1;
-
-        data_misaligned_ex_o <= 1'b1;
-      end
-    end else if (mult_multicycle_i) begin
-      mult_operand_c_ex_o <= operand_c_fw_id;
     end else begin
-      // normal pipeline unstall case
+      if (setback_i) begin
+        alu_en_ex_o            <= '0;
+        alu_operator_ex_o      <= ALU_SLTU;
+        alu_operand_a_ex_o     <= '0;
+        alu_operand_b_ex_o     <= '0;
+        alu_operand_c_ex_o     <= '0;
+        bmask_a_ex_o           <= '0;
+        bmask_b_ex_o           <= '0;
+        imm_vec_ext_ex_o       <= '0;
+        alu_vec_mode_ex_o      <= '0;
+        alu_clpx_shift_ex_o    <= 2'b0;
+        alu_is_clpx_ex_o       <= 1'b0;
+        alu_is_subrot_ex_o     <= 1'b0;
 
-      if (id_valid_o) begin  // unstall the whole pipeline
-        alu_en_ex_o <= alu_en;
-        if (alu_en) begin
-          alu_operator_ex_o   <= alu_operator;
-          alu_operand_a_ex_o  <= alu_operand_a;
-          alu_operand_b_ex_o  <= alu_operand_b;
-          alu_operand_c_ex_o  <= alu_operand_c;
-          bmask_a_ex_o        <= bmask_a_id;
-          bmask_b_ex_o        <= bmask_b_id;
-          imm_vec_ext_ex_o    <= imm_vec_ext_id;
-          alu_vec_mode_ex_o   <= alu_vec_mode;
-          alu_is_clpx_ex_o    <= is_clpx;
-          alu_clpx_shift_ex_o <= instr[14:13];
-          alu_is_subrot_ex_o  <= is_subrot;
+        mult_operator_ex_o     <= MUL_MAC32;
+        mult_operand_a_ex_o    <= '0;
+        mult_operand_b_ex_o    <= '0;
+        mult_operand_c_ex_o    <= '0;
+        mult_en_ex_o           <= 1'b0;
+        mult_sel_subword_ex_o  <= 1'b0;
+        mult_signed_mode_ex_o  <= 2'b00;
+        mult_imm_ex_o          <= '0;
+
+        mult_dot_op_a_ex_o     <= '0;
+        mult_dot_op_b_ex_o     <= '0;
+        mult_dot_op_c_ex_o     <= '0;
+        mult_dot_signed_ex_o   <= '0;
+        mult_is_clpx_ex_o      <= 1'b0;
+        mult_clpx_shift_ex_o   <= 2'b0;
+        mult_clpx_img_ex_o     <= 1'b0;
+
+        apu_en_ex_o            <= '0;
+        apu_op_ex_o            <= '0;
+        apu_lat_ex_o           <= '0;
+        apu_operands_ex_o[0]   <= '0;
+        apu_operands_ex_o[1]   <= '0;
+        apu_operands_ex_o[2]   <= '0;
+        apu_flags_ex_o         <= '0;
+        apu_waddr_ex_o         <= '0;
+
+
+        regfile_waddr_ex_o     <= 6'b0;
+        regfile_we_ex_o        <= 1'b0;
+
+        regfile_alu_waddr_ex_o <= 6'b0;
+        regfile_alu_we_ex_o    <= 1'b0;
+        prepost_useincr_ex_o   <= 1'b0;
+
+        csr_access_ex_o        <= 1'b0;
+        csr_op_ex_o            <= CSR_OP_READ;
+
+        data_we_ex_o           <= 1'b0;
+        data_type_ex_o         <= 2'b0;
+        data_sign_ext_ex_o     <= 2'b0;
+        data_reg_offset_ex_o   <= 2'b0;
+        data_req_ex_o          <= 1'b0;
+        data_load_event_ex_o   <= 1'b0;
+        atop_ex_o              <= 5'b0;
+
+        data_misaligned_ex_o   <= 1'b0;
+
+        pc_ex_o                <= '0;
+
+        branch_in_ex_o         <= 1'b0;
+
+      end else if (data_misaligned_i) begin
+        // misaligned data access case
+        if (ex_ready_i) begin  // misaligned access case, only unstall alu operands
+
+          // if we are using post increments, then we have to use the
+          // original value of the register for the second memory access
+          // => keep it stalled
+          if (prepost_useincr_ex_o == 1'b1) begin
+            alu_operand_a_ex_o <= operand_a_fw_id;
+          end
+
+          alu_operand_b_ex_o   <= 32'h4;
+          regfile_alu_we_ex_o  <= 1'b0;
+          prepost_useincr_ex_o <= 1'b1;
+
+          data_misaligned_ex_o <= 1'b1;
         end
+      end else if (mult_multicycle_i) begin
+        mult_operand_c_ex_o <= operand_c_fw_id;
+      end else begin
+        // normal pipeline unstall case
 
-        mult_en_ex_o <= mult_en;
-        if (mult_int_en) begin
-          mult_operator_ex_o    <= mult_operator;
-          mult_sel_subword_ex_o <= mult_sel_subword;
-          mult_signed_mode_ex_o <= mult_signed_mode;
-          mult_operand_a_ex_o   <= alu_operand_a;
-          mult_operand_b_ex_o   <= alu_operand_b;
-          mult_operand_c_ex_o   <= alu_operand_c;
-          mult_imm_ex_o         <= mult_imm_id;
-        end
-        if (mult_dot_en) begin
-          mult_operator_ex_o   <= mult_operator;
-          mult_dot_signed_ex_o <= mult_dot_signed;
-          mult_dot_op_a_ex_o   <= alu_operand_a;
-          mult_dot_op_b_ex_o   <= alu_operand_b;
-          mult_dot_op_c_ex_o   <= alu_operand_c;
-          mult_is_clpx_ex_o    <= is_clpx;
-          mult_clpx_shift_ex_o <= instr[14:13];
-          mult_clpx_img_ex_o   <= instr[25];
-        end
+        if (id_valid_o) begin  // unstall the whole pipeline
+          alu_en_ex_o <= alu_en;
+          if (alu_en) begin
+            alu_operator_ex_o   <= alu_operator;
+            alu_operand_a_ex_o  <= alu_operand_a;
+            alu_operand_b_ex_o  <= alu_operand_b;
+            alu_operand_c_ex_o  <= alu_operand_c;
+            bmask_a_ex_o        <= bmask_a_id;
+            bmask_b_ex_o        <= bmask_b_id;
+            imm_vec_ext_ex_o    <= imm_vec_ext_id;
+            alu_vec_mode_ex_o   <= alu_vec_mode;
+            alu_is_clpx_ex_o    <= is_clpx;
+            alu_clpx_shift_ex_o <= instr[14:13];
+            alu_is_subrot_ex_o  <= is_subrot;
+          end
 
-        // APU pipeline
-        apu_en_ex_o <= apu_en;
-        if (apu_en) begin
-          apu_op_ex_o       <= apu_op;
-          apu_lat_ex_o      <= apu_lat;
-          apu_operands_ex_o <= apu_operands;
-          apu_flags_ex_o    <= apu_flags;
-          apu_waddr_ex_o    <= apu_waddr;
-        end
+          mult_en_ex_o <= mult_en;
+          if (mult_int_en) begin
+            mult_operator_ex_o    <= mult_operator;
+            mult_sel_subword_ex_o <= mult_sel_subword;
+            mult_signed_mode_ex_o <= mult_signed_mode;
+            mult_operand_a_ex_o   <= alu_operand_a;
+            mult_operand_b_ex_o   <= alu_operand_b;
+            mult_operand_c_ex_o   <= alu_operand_c;
+            mult_imm_ex_o         <= mult_imm_id;
+          end
+          if (mult_dot_en) begin
+            mult_operator_ex_o   <= mult_operator;
+            mult_dot_signed_ex_o <= mult_dot_signed;
+            mult_dot_op_a_ex_o   <= alu_operand_a;
+            mult_dot_op_b_ex_o   <= alu_operand_b;
+            mult_dot_op_c_ex_o   <= alu_operand_c;
+            mult_is_clpx_ex_o    <= is_clpx;
+            mult_clpx_shift_ex_o <= instr[14:13];
+            mult_clpx_img_ex_o   <= instr[25];
+          end
 
-        regfile_we_ex_o <= regfile_we_id;
-        if (regfile_we_id) begin
-          regfile_waddr_ex_o <= regfile_waddr_id;
-        end
+          // APU pipeline
+          apu_en_ex_o <= apu_en;
+          if (apu_en) begin
+            apu_op_ex_o       <= apu_op;
+            apu_lat_ex_o      <= apu_lat;
+            apu_operands_ex_o <= apu_operands;
+            apu_flags_ex_o    <= apu_flags;
+            apu_waddr_ex_o    <= apu_waddr;
+          end
 
-        regfile_alu_we_ex_o <= regfile_alu_we_id;
-        if (regfile_alu_we_id) begin
-          regfile_alu_waddr_ex_o <= regfile_alu_waddr_id;
-        end
+          regfile_we_ex_o <= regfile_we_id;
+          if (regfile_we_id) begin
+            regfile_waddr_ex_o <= regfile_waddr_id;
+          end
 
-        prepost_useincr_ex_o <= prepost_useincr;
+          regfile_alu_we_ex_o <= regfile_alu_we_id;
+          if (regfile_alu_we_id) begin
+            regfile_alu_waddr_ex_o <= regfile_alu_waddr_id;
+          end
 
-        csr_access_ex_o      <= csr_access;
-        csr_op_ex_o          <= csr_op;
+          prepost_useincr_ex_o <= prepost_useincr;
 
-        data_req_ex_o        <= data_req_id;
-        if (data_req_id) begin  // only needed for LSU when there is an active request
-          data_we_ex_o         <= data_we_id;
-          data_type_ex_o       <= data_type_id;
-          data_sign_ext_ex_o   <= data_sign_ext_id;
-          data_reg_offset_ex_o <= data_reg_offset_id;
-          data_load_event_ex_o <= data_load_event_id;
-          atop_ex_o            <= atop_id;
-        end else begin
+          csr_access_ex_o      <= csr_access;
+          csr_op_ex_o          <= csr_op;
+
+          data_req_ex_o        <= data_req_id;
+          if (data_req_id) begin  // only needed for LSU when there is an active request
+            data_we_ex_o         <= data_we_id;
+            data_type_ex_o       <= data_type_id;
+            data_sign_ext_ex_o   <= data_sign_ext_id;
+            data_reg_offset_ex_o <= data_reg_offset_id;
+            data_load_event_ex_o <= data_load_event_id;
+            atop_ex_o            <= atop_id;
+          end else begin
+            data_load_event_ex_o <= 1'b0;
+          end
+
+          data_misaligned_ex_o <= 1'b0;
+
+          if ((ctrl_transfer_insn_in_id == BRANCH_COND) || data_req_id) begin
+            pc_ex_o <= pc_id_i;
+          end
+
+          branch_in_ex_o <= ctrl_transfer_insn_in_id == BRANCH_COND;
+        end else if (ex_ready_i) begin
+          // EX stage is ready but we don't have a new instruction for it,
+          // so we set all write enables to 0, but unstall the pipe
+
+          regfile_we_ex_o      <= 1'b0;
+
+          regfile_alu_we_ex_o  <= 1'b0;
+
+          csr_op_ex_o          <= CSR_OP_READ;
+
+          data_req_ex_o        <= 1'b0;
+
           data_load_event_ex_o <= 1'b0;
+
+          data_misaligned_ex_o <= 1'b0;
+
+          branch_in_ex_o       <= 1'b0;
+
+          apu_en_ex_o          <= 1'b0;
+
+          alu_operator_ex_o    <= ALU_SLTU;
+
+          mult_en_ex_o         <= 1'b0;
+
+          alu_en_ex_o          <= 1'b1;
+
+        end else if (csr_access_ex_o) begin
+          //In the EX stage there was a CSR access, to avoid multiple
+          //writes to the RF, disable regfile_alu_we_ex_o.
+          //Not doing it can overwrite the RF file with the currennt CSR value rather than the old one
+          regfile_alu_we_ex_o <= 1'b0;
         end
-
-        data_misaligned_ex_o <= 1'b0;
-
-        if ((ctrl_transfer_insn_in_id == BRANCH_COND) || data_req_id) begin
-          pc_ex_o <= pc_id_i;
-        end
-
-        branch_in_ex_o <= ctrl_transfer_insn_in_id == BRANCH_COND;
-      end else if (ex_ready_i) begin
-        // EX stage is ready but we don't have a new instruction for it,
-        // so we set all write enables to 0, but unstall the pipe
-
-        regfile_we_ex_o      <= 1'b0;
-
-        regfile_alu_we_ex_o  <= 1'b0;
-
-        csr_op_ex_o          <= CSR_OP_READ;
-
-        data_req_ex_o        <= 1'b0;
-
-        data_load_event_ex_o <= 1'b0;
-
-        data_misaligned_ex_o <= 1'b0;
-
-        branch_in_ex_o       <= 1'b0;
-
-        apu_en_ex_o          <= 1'b0;
-
-        alu_operator_ex_o    <= ALU_SLTU;
-
-        mult_en_ex_o         <= 1'b0;
-
-        alu_en_ex_o          <= 1'b1;
-
-      end else if (csr_access_ex_o) begin
-        //In the EX stage there was a CSR access, to avoid multiple
-        //writes to the RF, disable regfile_alu_we_ex_o.
-        //Not doing it can overwrite the RF file with the currennt CSR value rather than the old one
-        regfile_alu_we_ex_o <= 1'b0;
       end
     end
   end
@@ -1642,25 +1715,40 @@ module cv32e40p_id_stage
       mhpmevent_ld_stall_o     <= 1'b0;
       mhpmevent_pipe_stall_o   <= 1'b0;
     end else begin
-      // Helper signal
-      id_valid_q <= id_valid_o;
-      // ID stage counts
-      mhpmevent_minstret_o <= minstret;
-      mhpmevent_load_o <= minstret && data_req_id && !data_we_id;
-      mhpmevent_store_o <= minstret && data_req_id && data_we_id;
-      mhpmevent_jump_o           <= minstret && ((ctrl_transfer_insn_in_id == BRANCH_JAL) || (ctrl_transfer_insn_in_id == BRANCH_JALR));
-      mhpmevent_branch_o <= minstret && (ctrl_transfer_insn_in_id == BRANCH_COND);
-      mhpmevent_compressed_o <= minstret && is_compressed_i;
-      // EX stage count
-      mhpmevent_branch_taken_o <= mhpmevent_branch_o && branch_decision_i;
-      // IF stage count
-      mhpmevent_imiss_o <= perf_imiss_i;
-      // Jump-register-hazard; do not count stall on flushed instructions (id_valid_q used to only count first cycle)
-      mhpmevent_jr_stall_o <= jr_stall && !halt_id && id_valid_q;
-      // Load-use-hazard; do not count stall on flushed instructions (id_valid_q used to only count first cycle)
-      mhpmevent_ld_stall_o <= load_stall && !halt_id && id_valid_q;
-      // ELW
-      mhpmevent_pipe_stall_o <= perf_pipeline_stall;
+      if (setback_i) begin
+        id_valid_q               <= 1'b0;
+        mhpmevent_minstret_o     <= 1'b0;
+        mhpmevent_load_o         <= 1'b0;
+        mhpmevent_store_o        <= 1'b0;
+        mhpmevent_jump_o         <= 1'b0;
+        mhpmevent_branch_o       <= 1'b0;
+        mhpmevent_compressed_o   <= 1'b0;
+        mhpmevent_branch_taken_o <= 1'b0;
+        mhpmevent_jr_stall_o     <= 1'b0;
+        mhpmevent_imiss_o        <= 1'b0;
+        mhpmevent_ld_stall_o     <= 1'b0;
+        mhpmevent_pipe_stall_o   <= 1'b0;
+      end else begin
+        // Helper signal
+        id_valid_q <= id_valid_o;
+        // ID stage counts
+        mhpmevent_minstret_o <= minstret;
+        mhpmevent_load_o <= minstret && data_req_id && !data_we_id;
+        mhpmevent_store_o <= minstret && data_req_id && data_we_id;
+        mhpmevent_jump_o           <= minstret && ((ctrl_transfer_insn_in_id == BRANCH_JAL) || (ctrl_transfer_insn_in_id == BRANCH_JALR));
+        mhpmevent_branch_o <= minstret && (ctrl_transfer_insn_in_id == BRANCH_COND);
+        mhpmevent_compressed_o <= minstret && is_compressed_i;
+        // EX stage count
+        mhpmevent_branch_taken_o <= mhpmevent_branch_o && branch_decision_i;
+        // IF stage count
+        mhpmevent_imiss_o <= perf_imiss_i;
+        // Jump-register-hazard; do not count stall on flushed instructions (id_valid_q used to only count first cycle)
+        mhpmevent_jr_stall_o <= jr_stall && !halt_id && id_valid_q;
+        // Load-use-hazard; do not count stall on flushed instructions (id_valid_q used to only count first cycle)
+        mhpmevent_ld_stall_o <= load_stall && !halt_id && id_valid_q;
+        // ELW
+        mhpmevent_pipe_stall_o <= perf_pipeline_stall;
+      end
     end
   end
 
