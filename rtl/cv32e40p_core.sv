@@ -104,13 +104,22 @@ module cv32e40p_core
     // Recovery Ports for RF
     input logic        recover_i        ,
     // Write Port A
-    input logic [5:0]  regfile_waddr_a_i,
+    input logic [ 5:0] regfile_waddr_a_i,
     input logic [31:0] regfile_wdata_a_i,
     input logic        regfile_we_a_i   ,
     // Write Port B
-    input logic [5:0]  regfile_waddr_b_i,
+    input logic [ 5:0] regfile_waddr_b_i,
     input logic [31:0] regfile_wdata_b_i,
     input logic        regfile_we_b_i   ,
+    // Outputs from RF
+    // Port A
+    output logic         regfile_we_a_o   ,
+    output logic [ 5:0]  regfile_waddr_a_o,
+    output logic [31:0]  regfile_wdata_a_o,
+    // Port B
+    output logic         regfile_we_b_o   ,
+    output logic [ 5:0]  regfile_waddr_b_o,
+    output logic [31:0]  regfile_wdata_b_o,
     // Backup ports to the RF
     input  logic        regfile_backup_i  ,
     input  logic [ 5:0] regfile_raddr_ra_i,
@@ -534,12 +543,18 @@ module cv32e40p_core
   
   assign regfile_waddr_a = ( recover_i ) ? regfile_waddr_a_i : regfile_waddr_fw_wb_o;
   assign regfile_waddr_b = ( recover_i ) ? regfile_waddr_b_i : regfile_alu_waddr_fw;
+  assign regfile_waddr_a_o = regfile_waddr_a;
+  assign regfile_waddr_b_o = regfile_waddr_b;
   
   assign regfile_wdata_a = ( recover_i ) ? regfile_wdata_a_i : regfile_wdata;
   assign regfile_wdata_b = ( recover_i ) ? regfile_wdata_b_i : regfile_alu_wdata_fw;
+  assign regfile_wdata_a_o = regfile_wdata_a;
+  assign regfile_wdata_b_o = regfile_wdata_b;
 
   assign regfile_we_a = ( recover_i ) ? regfile_we_a_i : regfile_we_wb;
   assign regfile_we_b = ( recover_i ) ? regfile_we_b_i : regfile_alu_we_fw;
+  assign regfile_we_a_o = regfile_we_a;
+  assign regfile_we_b_o = regfile_we_b;
 
   /////////////////////////////////////////////////
   //   ___ ____    ____ _____  _    ____ _____   //
