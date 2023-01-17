@@ -104,6 +104,15 @@ module cv32e40p_wrapper
     input logic [5:0]  regfile_waddr_b_i,
     input logic [31:0] regfile_wdata_b_i,
     input logic        regfile_we_b_i   ,
+    // Outputs from RF
+    // Port A
+    output logic         regfile_we_a_o   ,
+    output logic [ 5:0]  regfile_waddr_a_o,
+    output logic [31:0]  regfile_wdata_a_o,
+    // Port B
+    output logic         regfile_we_b_o   ,
+    output logic [ 5:0]  regfile_waddr_b_o,
+    output logic [31:0]  regfile_wdata_b_o,
     // Backup ports to the RF
     input  logic        regfile_backup_i  ,
     input  logic [ 5:0] regfile_raddr_ra_i,
