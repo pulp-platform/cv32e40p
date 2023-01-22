@@ -90,6 +90,7 @@ module cv32e40p_core
 
     // Debug Interface
     input  logic debug_req_i,
+    input  logic debug_resume_i,
     output logic debug_havereset_o,
     output logic debug_running_o,
     output logic debug_halted_o,
@@ -589,6 +590,7 @@ module cv32e40p_core
 
       // Processor Enable
       .fetch_enable_i               ( fetch_enable         ),     // Delayed version so that clock can remain gated until fetch enabled
+      .debug_resume_i (debug_resume_i),
       .ctrl_busy_o(ctrl_busy),
       .is_decoding_o(is_decoding),
 

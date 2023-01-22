@@ -87,6 +87,7 @@ module cv32e40p_wrapper
 
     // Debug Interface
     input  logic debug_req_i,
+    input  logic debug_resume_i,
     output logic debug_havereset_o,
     output logic debug_running_o,
     output logic debug_halted_o,

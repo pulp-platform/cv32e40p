@@ -40,6 +40,7 @@ module cv32e40p_controller import cv32e40p_pkg::*;
   input  logic        setback_i,
 
   input  logic        fetch_enable_i,             // Start the decoding
+  input  logic        debug_resume_i,
   output logic        ctrl_busy_o,                // Core is busy processing instructions
   output logic        is_decoding_o,              // Core is in decoding state
   input  logic        is_fetch_failed_i,
@@ -1432,7 +1433,7 @@ endgenerate
 
         data_err_q         <= data_err_i;
 
-        debug_mode_q       <= debug_mode_n;
+        debug_mode_q       <= (debug_resume_i) ? 1'b0 : debug_mode_n;
 
         illegal_insn_q     <= illegal_insn_n;
 

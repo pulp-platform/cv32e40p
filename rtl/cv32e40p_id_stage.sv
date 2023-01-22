@@ -55,6 +55,7 @@ module cv32e40p_id_stage
     input logic scan_cg_en_i,
 
     input  logic fetch_enable_i,
+    input  logic debug_resume_i,
     output logic ctrl_busy_o,
     output logic is_decoding_o,
 
@@ -1106,6 +1107,7 @@ module cv32e40p_id_stage
       .setback_i    (setback_i),
 
       .fetch_enable_i   (fetch_enable_i),
+      .debug_resume_i   (debug_resume_i),
       .ctrl_busy_o      (ctrl_busy_o),
       .is_decoding_o    (is_decoding_o),
       .is_fetch_failed_i(is_fetch_failed_i),
