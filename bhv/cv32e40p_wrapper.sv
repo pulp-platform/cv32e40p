@@ -97,6 +97,15 @@ module cv32e40p_wrapper
     output logic core_sleep_o,
     input  logic [NUM_EXTERNAL_PERF-1:0] external_perf_i,
 
+    // Program Counter Backup
+    output logic [31:0] backup_program_counter_o,
+    output logic        backup_branch_o,
+    output logic [31:0] backup_branch_addr_o,
+    // Program Counter Recovery
+    input  logic        pc_recover_i,
+    input  logic [31:0] recovery_program_counter_i,
+    input  logic        recovery_branch_i,
+    input  logic [31:0] recovery_branch_addr_i,
     // Recovery Ports for RF
     input logic        recover_i        ,
     // Write Port A
