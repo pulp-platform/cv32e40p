@@ -905,38 +905,38 @@ module cv32e40p_id_stage
   /////////////////////////////////////////////////////////
 
   cv32e40p_register_file #(
-      .ADDR_WIDTH(6),
-      .DATA_WIDTH(32),
-      .FPU       (FPU),
-      .PULP_ZFINX(PULP_ZFINX)
+    .ADDR_WIDTH   ( 6          ),
+    .DATA_WIDTH   ( 32         ),
+    .FPU          ( FPU        ),
+    .PULP_ZFINX   ( PULP_ZFINX )
   ) register_file_i (
-      .clk  (clk),
-      .rst_n(rst_n),
-      .setback_i(setback_i),
+    .clk  (clk),
+    .rst_n(rst_n),
+    .setback_i(setback_i),
 
-      .scan_cg_en_i(scan_cg_en_i),
+    .scan_cg_en_i(scan_cg_en_i),
 
-      // Read port a
-      .raddr_a_i(regfile_addr_ra_id),
-      .rdata_a_o(regfile_data_ra_id),
+    // Read port a
+    .raddr_a_i(regfile_addr_ra_id),
+    .rdata_a_o(regfile_data_ra_id),
 
-      // Read port b
-      .raddr_b_i(regfile_addr_rb_id),
-      .rdata_b_o(regfile_data_rb_id),
+    // Read port b
+    .raddr_b_i(regfile_addr_rb_id),
+    .rdata_b_o(regfile_data_rb_id),
 
-      // Read port c
-      .raddr_c_i(regfile_addr_rc_id),
-      .rdata_c_o(regfile_data_rc_id),
+    // Read port c
+    .raddr_c_i(regfile_addr_rc_id),
+    .rdata_c_o(regfile_data_rc_id),
 
-      // Write port a
-      .waddr_a_i(regfile_waddr_wb_i),
-      .wdata_a_i(regfile_wdata_wb_i),
-      .we_a_i   (regfile_we_wb_i),
+    // Write port a
+    .waddr_a_i(regfile_waddr_wb_i),
+    .wdata_a_i(regfile_wdata_wb_i),
+    .we_a_i   (regfile_we_wb_i),
 
-      // Write port b
-      .waddr_b_i(regfile_alu_waddr_fw_i),
-      .wdata_b_i(regfile_alu_wdata_fw_i),
-      .we_b_i   (regfile_alu_we_fw_i)
+    // Write port b
+    .waddr_b_i(regfile_alu_waddr_fw_i),
+    .wdata_b_i(regfile_alu_wdata_fw_i),
+    .we_b_i   (regfile_alu_we_fw_i)
   );
 
 

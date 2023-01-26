@@ -94,7 +94,18 @@ module cv32e40p_wrapper
     // CPU Control Signals
     input  logic fetch_enable_i,
     output logic core_sleep_o,
-    input  logic [NUM_EXTERNAL_PERF-1:0] external_perf_i
+    input  logic [NUM_EXTERNAL_PERF-1:0] external_perf_i,
+
+    // Recovery Ports for RF
+    input logic        recover_i        ,
+    // Write Port A
+    input logic [5:0]  regfile_waddr_a_i,
+    input logic [31:0] regfile_wdata_a_i,
+    input logic        regfile_we_a_i   ,
+    // Write Port B
+    input logic [5:0]  regfile_waddr_b_i,
+    input logic [31:0] regfile_wdata_b_i,
+    input logic        regfile_we_b_i
 );
 
 `ifdef CV32E40P_ASSERT_ON

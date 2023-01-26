@@ -99,7 +99,18 @@ module cv32e40p_core
     output logic core_sleep_o,
 
     // External performance monitoring signals
-    input logic [NUM_EXTERNAL_PERF-1:0] external_perf_i
+    input logic [NUM_EXTERNAL_PERF-1:0] external_perf_i,
+
+    // Recovery Ports for RF
+    input logic        recover_i        ,
+    // Write Port A
+    input logic [5:0]  regfile_waddr_a_i,
+    input logic [31:0] regfile_wdata_a_i,
+    input logic        regfile_we_a_i   ,
+    // Write Port B
+    input logic [5:0]  regfile_waddr_b_i,
+    input logic [31:0] regfile_wdata_b_i,
+    input logic        regfile_we_b_i
 );
 
   import cv32e40p_pkg::*;
@@ -506,6 +517,21 @@ module cv32e40p_core
       .perf_imiss_o(perf_imiss)
   );
 
+  logic [5:0]  regfile_waddr_a, 
+               regfile_waddr_b;
+  logic [31:0] regfile_wdata_a,
+               regfile_wdata_b;
+  logic        regfile_we_a,
+               regfile_we_b;
+  
+  assign regfile_waddr_a = ( recover_i ) ? regfile_waddr_a_i : regfile_waddr_fw_wb_o;
+  assign regfile_waddr_b = ( recover_i ) ? regfile_waddr_b_i : regfile_alu_waddr_fw;
+  
+  assign regfile_wdata_a = ( recover_i ) ? regfile_wdata_a_i : regfile_wdata;
+  assign regfile_wdata_b = ( recover_i ) ? regfile_wdata_b_i : regfile_alu_wdata_fw;
+
+  assign regfile_we_a = ( recover_i ) ? regfile_we_a_i : regfile_we_wb;
+  assign regfile_we_b = ( recover_i ) ? regfile_we_b_i : regfile_alu_we_fw;
 
   /////////////////////////////////////////////////
   //   ___ ____    ____ _____  _    ____ _____   //
@@ -711,13 +737,13 @@ module cv32e40p_core
       .wake_from_sleep_o(wake_from_sleep),
 
       // Forward Signals
-      .regfile_waddr_wb_i(regfile_waddr_fw_wb_o),  // Write address ex-wb pipeline
-      .regfile_we_wb_i   (regfile_we_wb),  // write enable for the register file
-      .regfile_wdata_wb_i(regfile_wdata),  // write data to commit in the register file
+      .regfile_waddr_wb_i(regfile_waddr_a),  // Write address ex-wb pipeline
+      .regfile_we_wb_i   (regfile_we_a),  // write enable for the register file
+      .regfile_wdata_wb_i(regfile_wdata_a),  // write data to commit in the register file
 
-      .regfile_alu_waddr_fw_i(regfile_alu_waddr_fw),
-      .regfile_alu_we_fw_i   (regfile_alu_we_fw),
-      .regfile_alu_wdata_fw_i(regfile_alu_wdata_fw),
+      .regfile_alu_waddr_fw_i(regfile_waddr_b),
+      .regfile_alu_we_fw_i   (regfile_we_b),
+      .regfile_alu_wdata_fw_i(regfile_wdata_b),
 
       // from ALU
       .mult_multicycle_i(mult_multicycle),
