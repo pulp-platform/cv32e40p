@@ -40,6 +40,11 @@ module cv32e40p_aligner (
     input logic [31:0] hwlp_addr_i,
     input logic        hwlp_update_pc_i,
 
+    // Program Counter Recovery
+    input  logic        pc_recover_i,
+    input  logic [31:0] recovery_program_counter_i,
+    input  logic        recovery_branch_i,
+    input  logic [31:0] recovery_branch_addr_i,
     output logic [31:0] pc_o
 );
 
@@ -55,10 +60,14 @@ module cv32e40p_aligner (
   logic [15:0] r_instr_h;
   logic [31:0] hwlp_addr_q;
   logic [31:0] pc_q, pc_n;
+  logic branch_inp;
+  logic [31:0] branch_addr_inp;
   logic update_state;
   logic [31:0] pc_plus4, pc_plus2;
   logic aligner_ready_q, hwlp_update_pc_q;
 
+  assign branch_inp = (pc_recover_i) ? recovery_branch_i : branch_i;
+  assign branch_addr_inp = (pc_recover_i) ? recovery_branch_addr_i : branch_addr_i;
   assign pc_o     = pc_q;
 
   assign pc_plus2 = pc_q + 2;
@@ -80,6 +89,9 @@ module cv32e40p_aligner (
         pc_q             <= '0;
         aligner_ready_q  <= 1'b0;
         hwlp_update_pc_q <= 1'b0;
+      end else if (pc_recover_i) begin
+        pc_q <= branch_inp ? branch_addr_inp
+                           : recovery_program_counter_i;
       end else begin
         if (update_state) begin
           pc_q             <= pc_n;

@@ -67,6 +67,15 @@ module cv32e40p_if_stage #(
     output logic [31:0] pc_id_o,
     output logic is_fetch_failed_o,
 
+    // Program Counter Backup
+    output logic        backup_branch_o,
+    output logic [31:0] backup_branch_addr_o,
+    // Program Counter Recovery
+    input  logic        pc_recover_i,
+    input  logic [31:0] recovery_program_counter_i,
+    input  logic        recovery_branch_i,
+    input  logic [31:0] recovery_branch_addr_i,
+
     // Forwarding ports - control signals
     input logic clear_instr_valid_i,  // clear instruction valid bit in IF/ID pipe
     input logic pc_set_i,  // set the program counter to a new value
@@ -275,8 +284,15 @@ module cv32e40p_if_stage #(
       .branch_i        (branch_req),
       .hwlp_addr_i     (hwlp_target_i),
       .hwlp_update_pc_i(hwlp_jump_i),
+      .pc_recover_i    (pc_recover_i),
+      .recovery_program_counter_i (recovery_program_counter_i),
+      .recovery_branch_i ( recovery_branch_i ),
+      .recovery_branch_addr_i ( recovery_branch_addr_i ),
       .pc_o            (pc_if_o)
   );
+  // PC Backup port assign
+  assign backup_branch_o = branch_req;
+  assign backup_branch_addr_o = {branch_addr_n[31:1], 1'b0};
 
   cv32e40p_compressed_decoder #(
       .FPU(FPU)
