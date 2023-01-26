@@ -105,7 +105,15 @@ module cv32e40p_wrapper
     // Write Port B
     input logic [5:0]  regfile_waddr_b_i,
     input logic [31:0] regfile_wdata_b_i,
-    input logic        regfile_we_b_i
+    input logic        regfile_we_b_i   ,
+    // Backup ports to the RF
+    input  logic        regfile_backup_i  ,
+    input  logic [ 5:0] regfile_raddr_ra_i,
+    input  logic [ 5:0] regfile_raddr_rb_i,
+    input  logic [ 5:0] regfile_raddr_rc_i,
+    output logic [31:0] regfile_rdata_ra_o,
+    output logic [31:0] regfile_rdata_rb_o,
+    output logic [31:0] regfile_rdata_rc_o
 );
 
 `ifdef CV32E40P_ASSERT_ON

@@ -110,7 +110,15 @@ module cv32e40p_core
     // Write Port B
     input logic [5:0]  regfile_waddr_b_i,
     input logic [31:0] regfile_wdata_b_i,
-    input logic        regfile_we_b_i
+    input logic        regfile_we_b_i   ,
+    // Backup ports to the RF
+    input  logic        regfile_backup_i  ,
+    input  logic [ 5:0] regfile_raddr_ra_i,
+    input  logic [ 5:0] regfile_raddr_rb_i,
+    input  logic [ 5:0] regfile_raddr_rc_i, 
+    output logic [31:0] regfile_rdata_ra_o,
+    output logic [31:0] regfile_rdata_rb_o,
+    output logic [31:0] regfile_rdata_rc_o
 );
 
   import cv32e40p_pkg::*;
@@ -745,6 +753,15 @@ module cv32e40p_core
       .regfile_alu_we_fw_i   (regfile_we_b),
       .regfile_alu_wdata_fw_i(regfile_wdata_b),
 
+      // Backup ports to the RF
+      .regfile_backup_i   ( regfile_backup_i   ),
+      .regfile_raddr_ra_i ( regfile_raddr_ra_i ),
+      .regfile_raddr_rb_i ( regfile_raddr_rb_i ),
+      .regfile_raddr_rc_i ( regfile_raddr_rc_i ),
+      .regfile_rdata_ra_o ( regfile_rdata_ra_o ),
+      .regfile_rdata_rb_o ( regfile_rdata_rb_o ),
+      .regfile_rdata_rc_o ( regfile_rdata_rc_o ),
+
       // from ALU
       .mult_multicycle_i(mult_multicycle),
 
@@ -870,7 +887,7 @@ module cv32e40p_core
       .regfile_we_i   (regfile_we_ex),
 
       // Output of ex stage pipeline
-      .regfile_waddr_wb_o(regfile_waddr_fw_wb_o),
+      .regfile_waddr_wb_o(regfile_waddr_fw_wb_o), // Regfile A port 
       .regfile_we_wb_o   (regfile_we_wb),
       .regfile_wdata_wb_o(regfile_wdata),
 
@@ -879,7 +896,7 @@ module cv32e40p_core
       .branch_decision_o(branch_decision),
 
       // To ID stage: Forwarding signals
-      .regfile_alu_waddr_fw_o(regfile_alu_waddr_fw),
+      .regfile_alu_waddr_fw_o(regfile_alu_waddr_fw), // Regfile B port
       .regfile_alu_we_fw_o   (regfile_alu_we_fw),
       .regfile_alu_wdata_fw_o(regfile_alu_wdata_fw),
 
@@ -1070,6 +1087,8 @@ module cv32e40p_core
       .apu_contention_i        (perf_apu_cont),
       .apu_dep_i               (perf_apu_dep),
       .apu_wb_i                (perf_apu_wb),
+
+      // External Performece Counters
       .external_perf_i         (external_perf_i)
   );
 
