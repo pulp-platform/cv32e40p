@@ -125,6 +125,22 @@ module cv32e40p_cs_registers
     output logic [N_HWLP_BITS-1:0] hwlp_regid_o,
     output logic [            2:0] hwlp_we_o,
 
+    // CSRs Backup
+    output logic [ 6:0] backup_mstatus_o ,
+    output logic [31:0] backup_mie_o     ,
+    output logic [31:0] backup_mscratch_o,
+    output logic [ 5:0] backup_mcause_o  ,
+
+    // CSRs Recovery
+    input  logic        recover_i          ,
+    input  logic [ 6:0] recovery_mstatus_i ,
+    input  logic [31:0] recovery_mie_i     ,
+    input  logic [23:0] recovery_mtvec_i   ,
+    input  logic [31:0] recovery_mscratch_i,
+    input  logic [31:0] recovery_mip_i     ,
+    input  logic [31:0] recovery_mepc_i    ,
+    input  logic [ 5:0] recovery_mcause_i  ,
+
     // Performance Counters
     input logic mhpmevent_minstret_i,
     input logic mhpmevent_load_i,
@@ -1301,30 +1317,49 @@ module cv32e40p_cs_registers
           fflags_q <= 'b0;
         end
         if (PULP_SECURE == 1) begin
-          mstatus_q <= mstatus_n;
+          mstatus_q <= (recover_i) ? {recovery_mstatus_i[6],
+                                      recovery_mstatus_i[5],
+                                      recovery_mstatus_i[4],
+                                      recovery_mstatus_i[3],
+                                      PrivLvl_t'{recovery_mstatus_i[2:1]},
+                                      recovery_mstatus_i[0]}
+                                    : mstatus_n;
         end else begin
-          mstatus_q  <= '{
-                  uie:  1'b0,
-                  mie:  mstatus_n.mie,
-                  upie: 1'b0,
-                  mpie: mstatus_n.mpie,
-                  mpp:  PRIV_LVL_M,
-                  mprv: 1'b0
-                };
+          mstatus_q  <= (recover_i) ? '{uie:  recovery_mstatus_i[6],
+                                        mie:  recovery_mstatus_i[5],
+                                        upie: recovery_mstatus_i[4],
+                                        mpie: recovery_mstatus_i[3],
+                                        mpp:  PrivLvl_t'{recovery_mstatus_i[2:1]},
+                                        mprv: recovery_mstatus_i[0]}
+                                    : '{uie:  1'b0,
+                                        mie:  mstatus_n.mie,
+                                        upie: 1'b0,
+                                        mpie: mstatus_n.mpie,
+                                        mpp:  PRIV_LVL_M,
+                                        mprv: 1'b0};
         end
-        mepc_q       <= mepc_n;
-        mcause_q     <= mcause_n;
+        mepc_q       <= (recover_i) ? recovery_mepc_i : mepc_n;
+        mcause_q     <= (recover_i) ? recovery_mcause_i : mcause_n;
         depc_q       <= depc_n;
         dcsr_q       <= dcsr_n;
         dscratch0_q  <= dscratch0_n;
         dscratch1_q  <= dscratch1_n;
-        mscratch_q   <= mscratch_n;
-        mie_q        <= mie_n;
-        mtvec_q      <= mtvec_n;
+        mscratch_q   <= (recover_i) ? recovery_mscratch_i : mscratch_n;
+        mie_q        <= (recover_i) ? recovery_mie_i : mie_n;
+        mtvec_q      <= (recover_i) ? recovery_mtvec_i : mtvec_n;
         mtvec_mode_q <= mtvec_mode_n;
       end
     end
   end
+  assign backup_mstatus_o  = {mstatus_q.uie,
+                              mstatus_q.mie,
+                              mstatus_q.upie,
+                              mstatus_q.mpie,
+                              logic'{mstatus_q.mpp},
+                              mstatus_q.mprv};
+  assign backup_mie_o      = mie_q;
+  assign backup_mscratch_o = mscratch_q;
+  assign backup_mcause_o   = mcause_q;
   ////////////////////////////////////////////////////////////////////////
   //  ____       _                   _____     _                        //
   // |  _ \  ___| |__  _   _  __ _  |_   _| __(_) __ _  __ _  ___ _ __  //

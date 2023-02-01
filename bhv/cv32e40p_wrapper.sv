@@ -132,6 +132,22 @@ module cv32e40p_wrapper
     output logic [31:0] regfile_rdata_ra_o,
     output logic [31:0] regfile_rdata_rb_o,
     output logic [31:0] regfile_rdata_rc_o,
+    // CSRs Backup
+    output logic [ 6:0] backup_mstatus_o ,
+    output logic [31:0] backup_mie_o     ,
+    output logic [23:0] backup_mtvec_o   ,
+    output logic [31:0] backup_mscratch_o,
+    output logic [31:0] backup_mip_o     ,
+    output logic [31:0] backup_mepc_o    ,
+    output logic [ 5:0] backup_mcause_o  ,
+    // CSRs Recovery
+    input  logic [ 6:0] recovery_mstatus_i ,
+    input  logic [31:0] recovery_mie_i     ,
+    input  logic [23:0] recovery_mtvec_i   ,
+    input  logic [31:0] recovery_mscratch_i,
+    input  logic [31:0] recovery_mip_i     ,
+    input  logic [31:0] recovery_mepc_i    ,
+    input  logic [ 5:0] recovery_mcause_i  ,
     // External Performece Counters
     input  logic [NUM_EXT_PERF_CNTRS-1:0] ext_perf_cntrs_i
 );
