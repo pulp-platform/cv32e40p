@@ -137,7 +137,23 @@ module cv32e40p_core
     input  logic [ 5:0] regfile_raddr_rc_i, 
     output logic [31:0] regfile_rdata_ra_o,
     output logic [31:0] regfile_rdata_rb_o,
-    output logic [31:0] regfile_rdata_rc_o
+    output logic [31:0] regfile_rdata_rc_o,
+    // CSRs Backup
+    output logic [ 6:0] backup_mstatus_o,
+    output logic [31:0] backup_mie_o,
+    output logic [23:0] backup_mtvec_o,
+    output logic [31:0] backup_mscratch_o,
+    output logic [31:0] backup_mip_o,
+    output logic [31:0] backup_mepc_o,
+    output logic [ 5:0] backup_mcause_o,
+    // CSRs Recovery
+    input  logic [ 6:0] recovery_mstatus_i ,
+    input  logic [31:0] recovery_mie_i     ,
+    input  logic [23:0] recovery_mtvec_i   ,
+    input  logic [31:0] recovery_mscratch_i,
+    input  logic [31:0] recovery_mip_i     ,
+    input  logic [31:0] recovery_mepc_i    ,
+    input  logic [ 5:0] recovery_mcause_i
 );
 
   import cv32e40p_pkg::*;
@@ -1107,6 +1123,21 @@ module cv32e40p_core
       .hwlp_we_o   (csr_hwlp_we),
       .hwlp_data_o (csr_hwlp_data),
 
+      // CSRs Backup
+      .backup_mstatus_o  ( backup_mstatus_o  ),
+      .backup_mie_o      ( backup_mie_o      ),
+      .backup_mscratch_o ( backup_mscratch_o ),
+      .backup_mcause_o   ( backup_mcause_o   ),
+      // CSRs Recovery
+      .recover_i           ( recover_i           ),
+      .recovery_mstatus_i  ( recovery_mstatus_i  ),
+      .recovery_mie_i      ( recovery_mie_i      ),
+      .recovery_mtvec_i    ( recovery_mtvec_i    ),
+      .recovery_mscratch_i ( recovery_mscratch_i ),
+      .recovery_mip_i      ( recovery_mip_i      ),
+      .recovery_mepc_i     ( recovery_mepc_i     ),
+      .recovery_mcause_i   ( recovery_mcause_i   ),
+
       // performance counter related signals
       .mhpmevent_minstret_i    (mhpmevent_minstret),
       .mhpmevent_load_i        (mhpmevent_load),
@@ -1127,6 +1158,10 @@ module cv32e40p_core
       // External Performece Counters
       .external_perf_i         (external_perf_i)
   );
+
+  assign backup_mtvec_o = mtvec;
+  assign backup_mip_o   = mip;
+  assign backup_mepc_o  = mepc;
 
   //  CSR access
   assign csr_addr     = csr_addr_int;
