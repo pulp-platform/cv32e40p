@@ -1321,7 +1321,7 @@ module cv32e40p_cs_registers
                                       recovery_mstatus_i[5],
                                       recovery_mstatus_i[4],
                                       recovery_mstatus_i[3],
-                                      PrivLvl_t'{recovery_mstatus_i[2:1]},
+                                      PrivLvl_t'(recovery_mstatus_i[2:1]),
                                       recovery_mstatus_i[0]}
                                     : mstatus_n;
         end else begin
@@ -1329,7 +1329,7 @@ module cv32e40p_cs_registers
                                         mie:  recovery_mstatus_i[5],
                                         upie: recovery_mstatus_i[4],
                                         mpie: recovery_mstatus_i[3],
-                                        mpp:  PrivLvl_t'{recovery_mstatus_i[2:1]},
+                                        mpp:  PrivLvl_t'(recovery_mstatus_i[2:1]),
                                         mprv: recovery_mstatus_i[0]}
                                     : '{uie:  1'b0,
                                         mie:  mstatus_n.mie,
@@ -1355,7 +1355,7 @@ module cv32e40p_cs_registers
                               mstatus_q.mie,
                               mstatus_q.upie,
                               mstatus_q.mpie,
-                              logic'{mstatus_q.mpp},
+                              logic'(mstatus_q.mpp),
                               mstatus_q.mprv};
   assign backup_mie_o      = mie_q;
   assign backup_mscratch_o = mscratch_q;
