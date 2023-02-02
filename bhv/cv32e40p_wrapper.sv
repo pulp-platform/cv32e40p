@@ -33,7 +33,7 @@ module cv32e40p_wrapper
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
     parameter NUM_MHPMCOUNTERS = 1,
-    parameter NUM_EXT_PERF_CNTRS = 0
+    parameter NUM_EXTERNAL_PERF = 0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -149,7 +149,7 @@ module cv32e40p_wrapper
     input  logic [31:0] recovery_mepc_i    ,
     input  logic [ 5:0] recovery_mcause_i  ,
     // External Performece Counters
-    input  logic [NUM_EXT_PERF_CNTRS-1:0] ext_perf_cntrs_i
+    input  logic [NUM_EXTERNAL_PERF-1:0] external_perf_i
 );
 
 `ifdef CV32E40P_ASSERT_ON
@@ -270,7 +270,7 @@ module cv32e40p_wrapper
       .FPU             (FPU),
       .PULP_ZFINX      (PULP_ZFINX),
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
-      .NUM_EXT_PERF_CNTRS(NUM_EXT_PERF_CNTRS)
+      .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF)
   ) core_i (
       .*
   );

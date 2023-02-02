@@ -36,7 +36,7 @@ module cv32e40p_core
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
     parameter NUM_MHPMCOUNTERS = 1,
-    parameter NUM_EXT_PERF_CNTRS = 0
+    parameter NUM_EXTERNAL_PERF= 0
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -152,7 +152,7 @@ module cv32e40p_core
     input  logic [31:0] recovery_mepc_i    ,
     input  logic [ 5:0] recovery_mcause_i  ,
     // External Performece Counters
-    input  logic [NUM_EXT_PERF_CNTRS-1:0] ext_perf_cntrs_i
+    input  logic [NUM_EXTERNAL_PERF-1:0] external_perf_i
 );
 
   import cv32e40p_pkg::*;
@@ -1042,7 +1042,7 @@ module cv32e40p_core
       .USE_PMP         (USE_PMP),
       .N_PMP_ENTRIES   (N_PMP_ENTRIES),
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
-      .NUM_EXT_PERF_CNTRS(NUM_EXT_PERF_CNTRS),
+      .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF),
       .PULP_XPULP      (PULP_XPULP),
       .PULP_CLUSTER    (PULP_CLUSTER),
       .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN)
@@ -1154,7 +1154,7 @@ module cv32e40p_core
       .apu_dep_i               (perf_apu_dep),
       .apu_wb_i                (perf_apu_wb),
       // External Performece Counters
-      .ext_perf_cntrs_i        (ext_perf_cntrs_i)
+      .external_perf_i        (external_perf_i)
   );
 
   assign backup_mtvec_o = mtvec;
