@@ -977,6 +977,7 @@ module cv32e40p_core
       .clk  (clk),
       .rst_n(rst_ni),
       .setback_i(setback_i),
+      .recover_i(recover_i),
 
       //output to data memory
       .data_req_o    (data_req_pmp),
