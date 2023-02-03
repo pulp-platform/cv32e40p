@@ -567,7 +567,7 @@ module cv32e40p_core
       .if_busy_o   (if_busy),
       .perf_imiss_o(perf_imiss)
   );
-  assign backup_program_counter_o = pc_if;
+  assign backup_program_counter_o = pc_ex;
 
   logic [5:0]  regfile_waddr_a, 
                regfile_waddr_b;
