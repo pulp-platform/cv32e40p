@@ -29,6 +29,7 @@ module cv32e40p_load_store_unit #(
     input logic clk,
     input logic rst_n,
     input logic setback_i,
+    input logic recover_i,
 
     // output to data memory
     output logic data_req_o,
@@ -452,7 +453,7 @@ module cv32e40p_load_store_unit #(
     if (rst_n == 1'b0) begin
       cnt_q <= '0;
     end else begin
-      if (setback_i) begin
+      if (setback_i || recover_i) begin
         cnt_q <= '0;
       end else begin
         cnt_q <= next_cnt;
