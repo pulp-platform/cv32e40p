@@ -1355,7 +1355,7 @@ module cv32e40p_cs_registers
                               mstatus_q.mie,
                               mstatus_q.upie,
                               mstatus_q.mpie,
-                              logic'(mstatus_q.mpp),
+                              mstatus_q.mpp,
                               mstatus_q.mprv};
   assign backup_mie_o      = mie_q;
   assign backup_mscratch_o = mscratch_q;
