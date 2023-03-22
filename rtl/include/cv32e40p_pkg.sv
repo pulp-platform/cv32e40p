@@ -338,7 +338,7 @@ package cv32e40p_pkg;
     CSR_MINTTHRESH     = 12'h347,
     // CSR_MSCRATCHCSW    = 12'h348,
     // CSR_MSCRATCHCSWL   = 12'h349,
-    // CSR_MCLICBASE    = 12'h???
+    CSR_MCLICBASE      = 12'h350,
 
     // Physical memory protection (PMP)
     CSR_PMPCFG0   = 12'h3A0,  // Not included (USE_PMP = 0)

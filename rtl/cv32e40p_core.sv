@@ -38,7 +38,8 @@ module cv32e40p_core
     parameter NUM_EXTERNAL_PERF = 0
     parameter CLIC = 0,  // Core Local Interrupt Controller
     parameter NUM_MHPMCOUNTERS = 1,
-    parameter NUM_INTERRUPTS = 32
+    parameter NUM_INTERRUPTS = 32,
+    parameter MCLICBASE_ADDR =  32'h1A200000  // Base address for CLIC memory mapped registers
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -984,6 +985,7 @@ module cv32e40p_core
       .PULP_CLUSTER    (PULP_CLUSTER),
       .DEBUG_TRIGGER_EN(DEBUG_TRIGGER_EN),
       .CLIC            (CLIC),
+      .MCLICBASE_ADDR  (MCLICBASE_ADDR),
       .NUM_INTERRUPTS  (NUM_INTERRUPTS)
   ) cs_registers_i (
       .clk  (clk),

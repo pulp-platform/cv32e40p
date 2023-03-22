@@ -35,7 +35,8 @@ module cv32e40p_wrapper
     parameter NUM_MHPMCOUNTERS = 1,
     parameter NUM_EXTERNAL_PERF = 0
     parameter NUM_INTERRUPTS = 32,  // Number of interrupt lines
-    parameter CLIC = 0  // Whether we use the Core-local interrupt controller
+    parameter CLIC = 0,  // Whether we use the Core-local interrupt controller
+    parameter MCLICBASE_ADDR =  32'h1A200000 // Base address for CLIC memory mapped registers
 ) (
     // Clock and Reset
     input logic clk_i,
@@ -222,7 +223,8 @@ module cv32e40p_wrapper
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
       .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF)
       .NUM_INTERRUPTS  (NUM_INTERRUPTS),
-      .CLIC            (CLIC)
+      .CLIC            (CLIC),
+      .MCLICBASE_ADDR  (MCLICBASE_ADDR)
   ) core_i (
       .*
   );
