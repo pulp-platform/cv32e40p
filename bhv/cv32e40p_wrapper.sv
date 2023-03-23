@@ -33,7 +33,7 @@ module cv32e40p_wrapper
     parameter FPU = 0,  // Floating Point Unit (interfaced via APU interface)
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
     parameter NUM_MHPMCOUNTERS = 1,
-    parameter NUM_EXTERNAL_PERF = 0
+    parameter NUM_EXTERNAL_PERF = 0,
     parameter NUM_INTERRUPTS = 32,  // Number of interrupt lines
     parameter CLIC = 0,  // Whether we use the Core-local interrupt controller
     parameter MCLICBASE_ADDR =  32'h1A200000 // Base address for CLIC memory mapped registers
@@ -221,7 +221,7 @@ module cv32e40p_wrapper
       .FPU             (FPU),
       .PULP_ZFINX      (PULP_ZFINX),
       .NUM_MHPMCOUNTERS(NUM_MHPMCOUNTERS),
-      .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF)
+      .NUM_EXTERNAL_PERF(NUM_EXTERNAL_PERF),
       .NUM_INTERRUPTS  (NUM_INTERRUPTS),
       .CLIC            (CLIC),
       .MCLICBASE_ADDR  (MCLICBASE_ADDR)
