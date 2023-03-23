@@ -292,6 +292,7 @@ package cv32e40p_pkg;
     CSR_MISA    = 12'h301,
     CSR_MIE     = 12'h304,
     CSR_MTVEC   = 12'h305,
+    CSR_MTVT    = 12'h307,
 
     // Performance counters
     CSR_MCOUNTEREN    = 12'h306,
@@ -332,6 +333,12 @@ package cv32e40p_pkg;
     CSR_MCAUSE   = 12'h342,
     CSR_MTVAL    = 12'h343,
     CSR_MIP      = 12'h344,
+    CSR_MNXTI          = 12'h345,
+    CSR_MINTSTATUS     = 12'h346,
+    CSR_MINTTHRESH     = 12'h347,
+    // CSR_MSCRATCHCSW    = 12'h348,
+    // CSR_MSCRATCHCSWL   = 12'h349,
+    // CSR_MCLICBASE    = 12'h???
 
     // Physical memory protection (PMP)
     CSR_PMPCFG0   = 12'h3A0,  // Not included (USE_PMP = 0)
@@ -544,6 +551,16 @@ package cv32e40p_pkg;
     PRIV_LVL_S = 2'b01,
     PRIV_LVL_U = 2'b00
   } PrivLvl_t;
+
+  // interrupt status (clic)
+  typedef struct packed {
+    logic [31:24] mil;
+    logic [23:16] reserved;
+    // hardwired to '0
+    logic [15:8]  sil;
+    // hardwired to '0
+    logic [7:0]   uil;
+  } Mintstatus_t;
 
   // Machine Vendor ID - OpenHW JEDEC ID is '2 decimal (bank 13)'
   parameter MVENDORID_OFFSET = 7'h2;  // Final byte without parity bit

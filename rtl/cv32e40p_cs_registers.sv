@@ -42,7 +42,9 @@ module cv32e40p_cs_registers
     parameter NUM_EXTERNAL_PERF = 0,
     parameter PULP_XPULP       = 0,
     parameter PULP_CLUSTER     = 0,
-    parameter DEBUG_TRIGGER_EN = 1
+    parameter DEBUG_TRIGGER_EN = 1,
+    parameter CLIC             = 0,
+    parameter NUM_INTERRUPTS   = 32
 ) (
     // Clock and Reset
     input logic clk,
@@ -51,13 +53,17 @@ module cv32e40p_cs_registers
     // Hart ID
     input  logic [31:0] hart_id_i,
     output logic [23:0] mtvec_o,
+    output logic [23:0] mtvt_o,
     output logic [23:0] utvec_o,
+    output logic [23:0] utvt_o,
     output logic [ 1:0] mtvec_mode_o,
     output logic [ 1:0] utvec_mode_o,
 
     // Used for mtvec address
     input logic [31:0] mtvec_addr_i,
+    input logic [31:0] mtvt_addr_i,
     input logic        csr_mtvec_init_i,
+    input logic        csr_mtvt_init_i,
 
     // Interface to registers (SRAM like)
     input  csr_num_e           csr_addr_i,
@@ -74,6 +80,8 @@ module cv32e40p_cs_registers
     input  logic [31:0] mip_i,
     output logic        m_irq_enable_o,
     output logic        u_irq_enable_o,
+    output logic [7:0]  mintthresh_o,
+    output Mintstatus_t mintstatus_o,
 
     //csr_irq_sec_i is always 0 if PULP_SECURE is zero
     input  logic        csr_irq_sec_i,
@@ -82,6 +90,9 @@ module cv32e40p_cs_registers
     output logic [31:0] uepc_o,
     //mcounteren_o is always 0 if PULP_SECURE is zero
     output logic [31:0] mcounteren_o,
+
+    // Interrupts Selective Hardware Vectoring
+    input logic minhv_i,
 
     // debug
     input  logic        debug_mode_i,
@@ -112,7 +123,8 @@ module cv32e40p_cs_registers
 
     input logic                    csr_restore_dret_i,
     //coming from controller
-    input logic [       5:0]       csr_cause_i,
+    input logic [$clog2(NUM_INTERRUPTS):0] csr_cause_i,
+    input logic [7:0]                      csr_irq_level_i,
     //coming from controller
     input logic                    csr_save_cause_i,
     // Hardware loops
@@ -145,7 +157,7 @@ module cv32e40p_cs_registers
 
   localparam NUM_HPM_EVENTS = 16 + NUM_EXTERNAL_PERF;
 
-  localparam MTVEC_MODE = 2'b01;
+  localparam MTVEC_MODE        = CLIC ? 2'b11 : 2'b01;
 
   localparam MAX_N_PMP_ENTRIES = 16;
   localparam MAX_N_PMP_CFG = 4;
@@ -246,16 +258,23 @@ module cv32e40p_cs_registers
 
   logic [31:0] exception_pc;
   Status_t mstatus_q, mstatus_n;
-  logic [5:0] mcause_q, mcause_n;
-  logic [5:0] ucause_q, ucause_n;
+  logic [$clog2(NUM_INTERRUPTS):0] mcause_q, mcause_n;
+  logic [$clog2(NUM_INTERRUPTS):0] ucause_q, ucause_n;
   //not implemented yet
   logic [23:0] mtvec_n, mtvec_q;
   logic [23:0] utvec_n, utvec_q;
+  logic [23:0] mtvt_n, mtvt_q;
+  logic [23:0] utvt_n, utvt_q;
   logic [1:0] mtvec_mode_n, mtvec_mode_q;
   logic [1:0] utvec_mode_n, utvec_mode_q;
 
   logic [31:0] mip;  // Bits are masked according to IRQ_MASK
   logic [31:0] mie_q, mie_n;  // Bits are masked according to IRQ_MASK
+
+  logic [7:0]  mintthresh_n, mintthresh_q;
+  Mintstatus_t mintstatus_n, mintstatus_q;
+  logic [7:0]  mpil_n, mpil_q;
+  logic        minhv_n, minhv_q;
 
   logic [31:0] csr_mie_wdata;
   logic        csr_mie_we;
@@ -278,7 +297,7 @@ module cv32e40p_cs_registers
   logic [31:0] mhpmcounter_write_upper;  // write 32 upper bits mhpmcounter_q
   logic [31:0] mhpmcounter_write_increment;  // write increment of mhpmcounter_q
 
-  assign is_irq = csr_cause_i[5];
+  assign is_irq = csr_cause_i[$clog2(NUM_INTERRUPTS)];
 
   // mip CSR
   assign mip = mip_i;
@@ -292,11 +311,11 @@ module cv32e40p_cs_registers
     csr_mie_we    = 1'b1;
 
     case (csr_op_i)
-      CSR_OP_WRITE: csr_mie_wdata = csr_wdata_i;
-      CSR_OP_SET:   csr_mie_wdata = csr_wdata_i | mie_q;
-      CSR_OP_CLEAR: csr_mie_wdata = (~csr_wdata_i) & mie_q;
+      CSR_OP_WRITE: csr_mie_wdata = CLIC ? {32'b0} : csr_wdata_i;
+      CSR_OP_SET:   csr_mie_wdata = CLIC ? {32'b0} : csr_wdata_i | mie_q;
+      CSR_OP_CLEAR: csr_mie_wdata = CLIC ? {32'b0} : (~csr_wdata_i) & mie_q;
       CSR_OP_READ: begin
-        csr_mie_wdata = csr_wdata_i;
+        csr_mie_wdata = CLIC ? {32'b0} : csr_wdata_i;
         csr_mie_we    = 1'b0;
       end
     endcase
@@ -349,19 +368,51 @@ module cv32e40p_cs_registers
 
         // mie: machine interrupt enable
         CSR_MIE: begin
+        if (CLIC)
+          csr_rdata_int = '0;
+        else
           csr_rdata_int = mie_q;
         end
 
         // mtvec: machine trap-handler base address
         CSR_MTVEC: csr_rdata_int = {mtvec_q, 6'h0, mtvec_mode_q};
+        // mtvt: machine trap-handler vector table base address
+        CSR_MTVT: csr_rdata_int = {mtvt_q, 8'h0};
         // mscratch: machine scratch
         CSR_MSCRATCH: csr_rdata_int = mscratch_q;
+      // mscratchcsw: scratch swap CSR for multiple privilege modes
+//      CSR_MSCRATCHCSW:
+//        if (mstatus_q.mpp != PRIV_LVL_M)
+//          csr_rdata_int = mscratch_q;    // rd = mscratch
+//        else
+//          csr_rdata_int = csr_wdata_int; // rd = rs1
+//      // mscratchcswl: scratch swap CSR for interrupt levels
+//      CSR_MSCRATCHCSWL:
+//        if ((mpil_q == 0) != (mintstatus_q.mil == 0))
+//          csr_rdata_int = mscratch_q;    // rd = mscratch
+//        else
+//          csr_rdata_int = csr_wdata_int; // rd = rs1
         // mepc: exception program counter
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
-        CSR_MCAUSE: csr_rdata_int = {mcause_q[5], 26'b0, mcause_q[4:0]};
+        CSR_MCAUSE:
+        if (CLIC) begin
+          csr_rdata_int[31]    = mcause_q[$clog2(NUM_INTERRUPTS)];
+          csr_rdata_int[30]    = minhv_q; // TODO:
+          csr_rdata_int[29:28] = mstatus_q.mpp[1:0];
+          csr_rdata_int[27]    = mstatus_q.mpie;
+          csr_rdata_int[26:24] = '0; // reserved
+          csr_rdata_int[23:16] = mpil_q;
+          csr_rdata_int[15:12] = '0; // reserved
+          csr_rdata_int[11:$clog2(NUM_INTERRUPTS)]  = '0; // TODO: when more interrupt lines
+          csr_rdata_int[$clog2(NUM_INTERRUPTS)-1:0]   = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
+        end else
+          csr_rdata_int = {mcause_q[$clog2(NUM_INTERRUPTS)], {(32-$clog2(NUM_INTERRUPTS)-1){1'b0}}, mcause_q[$clog2(NUM_INTERRUPTS)-1:0]};
         // mip: interrupt pending
         CSR_MIP: begin
+        if (CLIC)
+          csr_rdata_int = '0;
+        else
           csr_rdata_int = mip;
         end
 
@@ -513,21 +564,59 @@ module cv32e40p_cs_registers
         CSR_MISA: csr_rdata_int = MISA_VALUE;
         // mie: machine interrupt enable
         CSR_MIE: begin
+        if (CLIC)
+          csr_rdata_int = '0;
+        else
           csr_rdata_int = mie_q;
         end
 
         // mtvec: machine trap-handler base address
         CSR_MTVEC: csr_rdata_int = {mtvec_q, 6'h0, mtvec_mode_q};
+        // mtvt: machine trap-handler vector table base address
+        CSR_MTVT: csr_rdata_int = {mtvt_q, 8'h0};
         // mscratch: machine scratch
         CSR_MSCRATCH: csr_rdata_int = mscratch_q;
+      // mscratchcsw: scratch swap CSR for multiple privilege modes
+//      CSR_MSCRATCHCSW:
+//        if (mstatus_q.mpp != PRIV_LVL_M)
+//          csr_rdata_int = mscratch_q;    // rd = mscratch
+//        else
+//          csr_rdata_int = csr_wdata_int; // rd = rs1
+//      // mscratchcswl: scratch swap CSR for interrupt levels
+//      CSR_MSCRATCHCSWL:
+//        if ((mpil_q == 0) != (mintstatus_q.mil == 0))
+//          csr_rdata_int = mscratch_q;    // rd = mscratch
+//        else
+//          csr_rdata_int = csr_wdata_int; // rd = rs1
         // mepc: exception program counter
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
-        CSR_MCAUSE: csr_rdata_int = {mcause_q[5], 26'b0, mcause_q[4:0]};
+        CSR_MCAUSE:
+        if (CLIC) begin
+          csr_rdata_int[31]    = mcause_q[$clog2(NUM_INTERRUPTS)];
+          csr_rdata_int[30]    = minhv_q; // TODO: implement
+          csr_rdata_int[29:28] = mstatus_q.mpp[1:0];
+          csr_rdata_int[27]    = mstatus_q.mpie;
+          csr_rdata_int[26:24] = '0; // reserved
+          csr_rdata_int[23:16] = mpil_q;
+          csr_rdata_int[15:12] = '0; // reserved
+          csr_rdata_int[11:$clog2(NUM_INTERRUPTS)]  = '0; // TODO: when more interrupt lines
+          csr_rdata_int[$clog2(NUM_INTERRUPTS)-1:0]   = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
+        end else
+          csr_rdata_int = {mcause_q[$clog2(NUM_INTERRUPTS)], {(32-$clog2(NUM_INTERRUPTS)-1){1'b0}}, mcause_q[$clog2(NUM_INTERRUPTS)-1:0]};
         // mip: interrupt pending
         CSR_MIP: begin
+        if (CLIC)
+          csr_rdata_int = '0;
+        else
           csr_rdata_int = mip;
         end
+        // mintstatus: interrupt status (clic)
+        CSR_MINTSTATUS: csr_rdata_int = mintstatus_q;
+
+        // mintthres: interrupt-level threshold (clic)
+        CSR_MINTTHRESH: csr_rdata_int = mintthresh_q;
+
         // mhartid: unique hardware thread id
         CSR_MHARTID: csr_rdata_int = hart_id_i;
 
@@ -646,7 +735,9 @@ module cv32e40p_cs_registers
       exception_pc            = pc_id_i;
       priv_lvl_n              = priv_lvl_q;
       mtvec_n                 = csr_mtvec_init_i ? mtvec_addr_i[31:8] : mtvec_q;
+      mtvt_n                  = csr_mtvt_init_i  ? mtvt_addr_i[31:6]  : mtvt_q;
       utvec_n                 = utvec_q;
+      utvt_n                  = utvt_q;
       mtvec_mode_n            = mtvec_mode_q;
       utvec_mode_n            = utvec_mode_q;
       pmp_reg_n.pmpaddr       = pmp_reg_q.pmpaddr;
@@ -655,6 +746,11 @@ module cv32e40p_cs_registers
       pmpcfg_we               = '0;
 
       mie_n                   = mie_q;
+      mintthresh_n            = mintthresh_q;
+      mintstatus_n            = mintstatus_q;
+      mpil_n                  = mpil_q;
+      minhv_n                 = minhv_q;
+
 
       if (FPU == 1) if (fflags_we_i) fflags_n = fflags_i | fflags_q;
 
@@ -683,27 +779,53 @@ module cv32e40p_cs_registers
         // mie: machine interrupt enable
         CSR_MIE:
         if (csr_we_int) begin
-          mie_n = csr_wdata_int & IRQ_MASK;
+          if (!CLIC)
+            mie_n = csr_wdata_int & 32'(IRQ_MASK);
         end
         // mtvec: machine trap-handler base address
         CSR_MTVEC:
         if (csr_we_int) begin
           mtvec_n      = csr_wdata_int[31:8];
-          mtvec_mode_n = {1'b0, csr_wdata_int[0]};  // Only direct and vectored mode are supported
+          mtvec_mode_n = csr_wdata_int[1:0]; // 00: directed mode, 01: vectored mode, 11: CLIC mode
+        end
+        CSR_MTVT:
+        if (csr_we_int) begin
+          mtvt_n       = csr_wdata_int[31:8];
         end
         // mscratch: machine scratch
         CSR_MSCRATCH:
         if (csr_we_int) begin
           mscratch_n = csr_wdata_int;
         end
+//      // mscratchcsw: scratch swap CSR for multiple privilege modes
+//      CSR_MSCRATCHCSW:
+//        if (csr_we_int && (mstatus_q.mpp != PRIV_LVL_M))
+//          mscratch_n = csr_wdata_int;
+//      // mscratchcswl: scratch swap CSR for interrupt levels
+//      CSR_MSCRATCHCSWL:
+//        if ((csr_we_int) && ((mpil_q == 0) != (mintstatus_q.mil == 0)))
+//          mscratch_n = csr_wdata_int;
         // mepc: exception program counter
         CSR_MEPC:
         if (csr_we_int) begin
           mepc_n = csr_wdata_int & ~32'b1;  // force 16-bit alignment
         end
         // mcause
-        CSR_MCAUSE: if (csr_we_int) mcause_n = {csr_wdata_int[31], csr_wdata_int[4:0]};
-
+        CSR_MCAUSE:
+        if (csr_we_int) begin
+          if (CLIC) begin
+            mcause_n[$clog2(NUM_INTERRUPTS)] = csr_wdata_int[31];
+            minhv_n            = minhv_i; //csr_wdata_int[30];
+            mstatus_n.mpp[1:0] = csr_wdata_int[29:28];
+            mstatus_n.mpie     = csr_wdata_int[27];
+            //csr_wdata_int[26:24]; // reserved
+            mpil_n             = csr_wdata_int[23:16]; //TODO
+            //csr_wdata_int[15:12]; // reserved
+            //csr_wdata_int[11:$clog2(NUM_INTERRUPTS)]; // TODO: when more interrupt lines
+            mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = csr_wdata_int[$clog2(NUM_INTERRUPTS)-1:0]; // Excode (interrupt ID)
+          end else
+            mcause_n = {csr_wdata_int[31], csr_wdata_int[$clog2(NUM_INTERRUPTS)-1:0]};
+        end
         // Debug
         CSR_DCSR:
         if (csr_we_int) begin
@@ -721,7 +843,7 @@ module cv32e40p_cs_registers
           dcsr_n.stoptime = 1'b0;  // stoptime
           dcsr_n.mprven = 1'b0;  // mprven
           dcsr_n.step = csr_wdata_int[2];
-          dcsr_n.prv       = (PrivLvl_t'(csr_wdata_int[1:0]) == PRIV_LVL_M) ? PRIV_LVL_M : PRIV_LVL_U; // prv (implemented as WARL)
+          dcsr_n.prv = (PrivLvl_t'(csr_wdata_int[1:0]) == PRIV_LVL_M) ? PRIV_LVL_M : PRIV_LVL_U; // prv (implemented as WARL)
         end
 
         CSR_DPC:
@@ -856,6 +978,10 @@ module cv32e40p_cs_registers
                 else mepc_n = exception_pc;
                 mcause_n = csr_cause_i;
 
+                // vertical synchronous exceptions are taken at interrupt level 0
+                // in the higher privilege mode
+                mpil_n           = mintstatus_q.mil;
+                mintstatus_n.mil = 8'b0;
               end else begin
                 if (~csr_irq_sec_i) begin
                   //U --> U
@@ -865,6 +991,8 @@ module cv32e40p_cs_registers
                   if (debug_csr_save_i) depc_n = exception_pc;
                   else uepc_n = exception_pc;
                   ucause_n = csr_cause_i;
+                  // TODO: upil needs to be updated here
+                  mintstatus_n.uil = csr_irq_level_i;
 
                 end else begin
                   //U --> M
@@ -875,6 +1003,8 @@ module cv32e40p_cs_registers
                   if (debug_csr_save_i) depc_n = exception_pc;
                   else mepc_n = exception_pc;
                   mcause_n = csr_cause_i;
+                  mpil_n           = mintstatus_q.mil;
+                  mintstatus_n.mil = csr_irq_level_i;
                 end
               end
             end  //PRIV_LVL_U
@@ -886,7 +1016,7 @@ module cv32e40p_cs_registers
                 dcsr_n.prv   = PRIV_LVL_M;
                 dcsr_n.cause = debug_cause_i;
                 depc_n       = exception_pc;
-              end else begin
+            end else if (is_irq) begin // interrupt
                 //Exceptions or Interrupts from PRIV_LVL_M always do M --> M
                 priv_lvl_n     = PRIV_LVL_M;
                 mstatus_n.mpie = mstatus_q.mie;
@@ -894,6 +1024,18 @@ module cv32e40p_cs_registers
                 mstatus_n.mpp  = PRIV_LVL_M;
                 mepc_n         = exception_pc;
                 mcause_n       = csr_cause_i;
+                mpil_n           = mintstatus_q.mil;
+                mintstatus_n.mil = csr_irq_level_i;
+            end else begin // exception
+                //Exceptions or Interrupts from PRIV_LVL_M always do M --> M
+                priv_lvl_n     = PRIV_LVL_M;
+                mstatus_n.mpie = mstatus_q.mie;
+                mstatus_n.mie  = 1'b0;
+                mstatus_n.mpp  = PRIV_LVL_M;
+                mepc_n         = exception_pc;
+                mcause_n       = csr_cause_i;
+                // mintstatus_n, mpil_n: horizontal synchronous traps preserve
+                // the interrupt level
               end
             end  //PRIV_LVL_M
             default: ;
@@ -916,12 +1058,16 @@ module cv32e40p_cs_registers
               priv_lvl_n     = PRIV_LVL_U;
               mstatus_n.mpie = 1'b1;
               mstatus_n.mpp  = PRIV_LVL_U;
+              // restore mpil_q. mpil itself is not touched
+              mintstatus_n.mil = mpil_q;
             end
             PRIV_LVL_M: begin
               mstatus_n.mie  = mstatus_q.mpie;
               priv_lvl_n     = PRIV_LVL_M;
               mstatus_n.mpie = 1'b1;
               mstatus_n.mpp  = PRIV_LVL_U;
+              // restore mpil_q. mpil itself is not touched
+              mintstatus_n.mil = mpil_q;
             end
             default: ;
           endcase
@@ -958,7 +1104,9 @@ module cv32e40p_cs_registers
       exception_pc = pc_id_i;
       priv_lvl_n = priv_lvl_q;
       mtvec_n = csr_mtvec_init_i ? mtvec_addr_i[31:8] : mtvec_q;
+      mtvt_n = csr_mtvt_init_i  ? mtvt_addr_i[31:6]  : mtvt_q;
       utvec_n = '0;  // Not used if PULP_SECURE == 0
+      utvt_n = '0;              // Not used if PULP_SECURE == 0
       pmp_reg_n.pmpaddr = '0;  // Not used if PULP_SECURE == 0
       pmp_reg_n.pmpcfg_packed = '0;  // Not used if PULP_SECURE == 0
       pmp_reg_n.pmpcfg = '0;  // Not used if PULP_SECURE == 0
@@ -966,6 +1114,11 @@ module cv32e40p_cs_registers
       pmpcfg_we = '0;
 
       mie_n = mie_q;
+      mintthresh_n = mintthresh_q;
+      mintstatus_n = mintstatus_q;
+      mpil_n = mpil_q;
+      minhv_n = minhv_q;
+
       mtvec_mode_n = mtvec_mode_q;
       utvec_mode_n = '0;  // Not used if PULP_SECURE == 0
 
@@ -996,27 +1149,61 @@ module cv32e40p_cs_registers
         // mie: machine interrupt enable
         CSR_MIE:
         if (csr_we_int) begin
-          mie_n = csr_wdata_int & IRQ_MASK;
+          if (!CLIC)
+            mie_n = csr_wdata_int & 32'(IRQ_MASK);
         end
         // mtvec: machine trap-handler base address
         CSR_MTVEC:
         if (csr_we_int) begin
           mtvec_n      = csr_wdata_int[31:8];
-          mtvec_mode_n = {1'b0, csr_wdata_int[0]};  // Only direct and vectored mode are supported
+        mtvec_mode_n = csr_wdata_int[1:0]; // 00: directed mode, 01: vectored mode, 11: CLIC mode
+        end
+        CSR_MTVT:
+        if (csr_we_int) begin
+          mtvt_n       = csr_wdata_int[31:8];
         end
         // mscratch: machine scratch
         CSR_MSCRATCH:
         if (csr_we_int) begin
           mscratch_n = csr_wdata_int;
         end
+      // mscratchcsw: scratch swap CSR for multiple privilege modes
+//      CSR_MSCRATCHCSW:
+//        if (csr_we_int && (mstatus_q.mpp != PRIV_LVL_M))
+//          mscratch_n = csr_wdata_int;
+//      // mscratchcswl: scratch swap CSR for interrupt levels
+//      CSR_MSCRATCHCSWL:
+//        if ((csr_we_int) && ((mpil_q == 0) != (mintstatus_q.mil == 0)))
+//          mscratch_n = csr_wdata_int;
         // mepc: exception program counter
         CSR_MEPC:
         if (csr_we_int) begin
           mepc_n = csr_wdata_int & ~32'b1;  // force 16-bit alignment
         end
         // mcause
-        CSR_MCAUSE: if (csr_we_int) mcause_n = {csr_wdata_int[31], csr_wdata_int[4:0]};
+        CSR_MCAUSE:
+        if (csr_we_int) begin
+          if (CLIC) begin
+            mcause_n[$clog2(NUM_INTERRUPTS)] = csr_wdata_int[31];
+            minhv_n            = csr_wdata_int[30]; // TODO: implement
+            mstatus_n.mpp[1:0] = csr_wdata_int[29:28];
+            mstatus_n.mpie     = csr_wdata_int[27];
+            //csr_wdata_int[26:24]; // reserved
+            mpil_n             = csr_wdata_int[23:16]; //TODO
+            //csr_wdata_int[15:12]; // reserved
+            //csr_wdata_int[11:$clog2(NUM_INTERRUPTS)];  // TODO: when more interrupt lines
+            mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = csr_wdata_int[$clog2(NUM_INTERRUPTS)-1:0];
+          end else
+            mcause_n = {csr_wdata_int[31], csr_wdata_int[$clog2(NUM_INTERRUPTS)-1:0]};
+        end
 
+        // mintstatus: interrupt status (clic)
+        // CSR_MINTSTATUS: // read-only
+
+        // mintthres: interrupt-level threshold (clic)
+        CSR_MINTTHRESH: if (csr_we_int) mintthresh_n = csr_wdata_int[7:0];
+
+        // debug
         CSR_DCSR:
         if (csr_we_int) begin
           // Following are read-only and never assigned here (dcsr_q value is used):
@@ -1101,13 +1288,24 @@ module cv32e40p_cs_registers
             dcsr_n.prv   = PRIV_LVL_M;
             dcsr_n.cause = debug_cause_i;
             depc_n       = exception_pc;
-          end else begin
+        end else if (is_irq) begin // interrupts
             priv_lvl_n     = PRIV_LVL_M;
             mstatus_n.mpie = mstatus_q.mie;
             mstatus_n.mie  = 1'b0;
             mstatus_n.mpp  = PRIV_LVL_M;
             mepc_n         = exception_pc;
             mcause_n       = csr_cause_i;
+            mpil_n           = mintstatus_q.mil;
+            mintstatus_n.mil = csr_irq_level_i;
+        end else begin // exceptions
+            priv_lvl_n     = PRIV_LVL_M;
+            mstatus_n.mpie = mstatus_q.mie;
+            mstatus_n.mie  = 1'b0;
+            mstatus_n.mpp  = PRIV_LVL_M;
+            mepc_n = exception_pc;
+            mcause_n       = csr_cause_i;
+            // mintstatus_n, mpil_n: horizontal synchronous traps preserve the
+            // interrupt level
           end
         end  //csr_save_cause_i
 
@@ -1116,6 +1314,8 @@ module cv32e40p_cs_registers
           priv_lvl_n     = PRIV_LVL_M;
           mstatus_n.mpie = 1'b1;
           mstatus_n.mpp  = PRIV_LVL_M;
+          // restore mpil_q. mpil itself is not touched
+          mintstatus_n.mil = mpil_q;
         end  //csr_restore_mret_i
 
         csr_restore_dret_i: begin  //DRET
@@ -1126,7 +1326,7 @@ module cv32e40p_cs_registers
         default: ;
       endcase
     end
-  end  //PULP_SECURE
+end //PULP_SECURE = 0
 
   assign hwlp_data_o = (PULP_XPULP) ? csr_wdata_int : '0;
 
@@ -1157,12 +1357,17 @@ module cv32e40p_cs_registers
   assign frm_o               = (FPU == 1) ? frm_q : '0;
 
   assign mtvec_o             = mtvec_q;
+  assign mtvt_o          = mtvt_q;
   assign utvec_o             = utvec_q;
+  assign utvt_o          = utvt_q;
   assign mtvec_mode_o        = mtvec_mode_q;
   assign utvec_mode_o        = utvec_mode_q;
 
   assign mepc_o              = mepc_q;
   assign uepc_o              = uepc_q;
+
+  assign mintthresh_o    = mintthresh_q;
+  assign mintstatus_o    = mintstatus_q;
 
   assign mcounteren_o        = PULP_SECURE ? mcounteren_q : '0;
 
@@ -1248,7 +1453,12 @@ module cv32e40p_cs_registers
       mscratch_q <= '0;
       mie_q <= '0;
       mtvec_q <= '0;
+      mtvt_q <= '0;
       mtvec_mode_q <= MTVEC_MODE;
+      mintthresh_q <= '0;
+      mintstatus_q <= '0;
+      mpil_q <= '0;
+      minhv_q <= '0;
     end else begin
       // update CSRs
       if (FPU == 1) begin
@@ -1279,7 +1489,12 @@ module cv32e40p_cs_registers
       mscratch_q   <= mscratch_n;
       mie_q        <= mie_n;
       mtvec_q      <= mtvec_n;
+      mtvt_q       <= mtvt_n;
       mtvec_mode_q <= mtvec_mode_n;
+      mintthresh_q <= mintthresh_n;
+      mintstatus_q <= mintstatus_n;
+      mpil_q       <= mpil_n;
+      minhv_q      <= minhv_n;
     end
   end
   ////////////////////////////////////////////////////////////////////////
@@ -1584,7 +1799,7 @@ module cv32e40p_cs_registers
 
   // Check that mie_bypass_o equals mie_n
   a_mie_bypass :
-  assert property (@(posedge clk) disable iff (!rst_n) (1'b1) |-> (mie_bypass_o == mie_n));
+  assert property (@(posedge clk) disable iff (!rst_n) (1'b1) |-> if (CLIC) (mie_bypass_o == {32'b0}) else (mie_bypass_o == mie_n));
 
 `endif
 
