@@ -68,4 +68,3 @@ sources:
       files:
         - bhv/include/cv32e40p_tracer_pkg.sv
         - bhv/cv32e40p_wrapper.sv
-
