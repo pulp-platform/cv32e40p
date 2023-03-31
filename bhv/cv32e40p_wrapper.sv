@@ -81,6 +81,8 @@ module cv32e40p_wrapper
     output logic [31:0] shadow_wdata_o,
     input  logic [31:0] shadow_rdata_i,
 
+    output logic [5:0]  data_atop_o, // atomic operation, only active if parameter `A_EXTENSION != 0
+
     // apu-interconnect
     // handshake signals
     output logic                              apu_req_o,
