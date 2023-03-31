@@ -952,6 +952,7 @@ module cv32e40p_id_stage
       .DATA_WIDTH(32),
       .FPU       (FPU),
       .PULP_ZFINX(PULP_ZFINX),
+      .NUM_INTERRUPTS(NUM_INTERRUPTS),
       .SHADOW    (SHADOW),
       .ABI       (ABI)
   ) register_file_i (
