@@ -569,6 +569,7 @@ module cv32e40p_id_stage
       REGC_RD:   regfile_addr_rc_id = {fregfile_ena & regfile_fp_c, instr[REG_D_MSB:REG_D_LSB]};
       REGC_S1:   regfile_addr_rc_id = {fregfile_ena & regfile_fp_c, instr[REG_S1_MSB:REG_S1_LSB]};
       REGC_S4:   regfile_addr_rc_id = {fregfile_ena & regfile_fp_c, instr[REG_S4_MSB:REG_S4_LSB]};
+      default:;
     endcase
   end
 
@@ -652,6 +653,7 @@ module cv32e40p_id_stage
     unique case (imm_a_mux_sel)
       IMMA_Z:    imm_a = imm_z_type;
       IMMA_ZERO: imm_a = '0;
+      default:;
     endcase
   end
 
@@ -791,6 +793,7 @@ module cv32e40p_id_stage
     unique case (bmask_a_mux)
       BMASK_A_ZERO: bmask_a_id_imm = '0;
       BMASK_A_S3:   bmask_a_id_imm = imm_s3_type[4:0];
+      default:;
     endcase
   end
   always_comb begin
@@ -799,6 +802,7 @@ module cv32e40p_id_stage
       BMASK_B_ONE:  bmask_b_id_imm = 5'd1;
       BMASK_B_S2:   bmask_b_id_imm = imm_s2_type[4:0];
       BMASK_B_S3:   bmask_b_id_imm = imm_s3_type[4:0];
+      default:;
     endcase
   end
 
@@ -806,12 +810,14 @@ module cv32e40p_id_stage
     unique case (alu_bmask_a_mux_sel)
       BMASK_A_IMM: bmask_a_id = bmask_a_id_imm;
       BMASK_A_REG: bmask_a_id = operand_b_fw_id[9:5];
+      default;:
     endcase
   end
   always_comb begin
     unique case (alu_bmask_b_mux_sel)
       BMASK_B_IMM: bmask_b_id = bmask_b_id_imm;
       BMASK_B_REG: bmask_b_id = operand_b_fw_id[4:0];
+      default:;
     endcase
   end
 
@@ -822,6 +828,7 @@ module cv32e40p_id_stage
     unique case (mult_imm_mux)
       MIMM_ZERO: mult_imm_id = '0;
       MIMM_S3:   mult_imm_id = imm_s3_type[4:0];
+      default:;
     endcase
   end
 

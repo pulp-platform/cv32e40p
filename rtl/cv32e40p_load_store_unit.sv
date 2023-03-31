@@ -431,6 +431,7 @@ module cv32e40p_load_store_unit #(
       2'b11: begin
         next_cnt = cnt_q;
       end
+      default:;
     endcase
   end
 
