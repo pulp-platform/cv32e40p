@@ -107,7 +107,7 @@ module cv32e40p_if_stage #(
 
     // misc signals
     output logic if_busy_o,  // is the IF stage busy fetching instructions?
-    output logic perf_imiss_o  // Instruction Fetch Miss
+    output logic perf_imiss_o,  // Instruction Fetch Miss
 
     input  logic [31:0] jalmnxti_pc_i,         // jump target address calculated from cs_register module for jalmnxti csr
     input  logic        jalmnxti_ctrl_i        // jump req signal from cs_register module for jalmnxti csr

@@ -800,7 +800,7 @@ module cv32e40p_id_stage
     unique case (alu_bmask_a_mux_sel)
       BMASK_A_IMM: bmask_a_id = bmask_a_id_imm;
       BMASK_A_REG: bmask_a_id = operand_b_fw_id[9:5];
-      default;:
+      default:;
     endcase
   end
   always_comb begin

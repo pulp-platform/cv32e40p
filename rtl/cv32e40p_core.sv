@@ -37,7 +37,7 @@ module cv32e40p_core
     parameter PULP_ZFINX = 0,  // Float-in-General Purpose registers
     parameter NUM_EXTERNAL_PERF = 0,
     parameter CLIC = 0,  // Core Local Interrupt Controller
-    parameter MCLICBASE_ADDR = 32'h1A200000        // Base address for CLIC memory mapped registers
+    parameter MCLICBASE_ADDR = 32'h1A200000,        // Base address for CLIC memory mapped registers
     parameter NUM_MHPMCOUNTERS = 1,
     parameter NUM_INTERRUPTS = 32,
     parameter SHADOW =  0 // register shadow saving extension
@@ -569,7 +569,7 @@ module cv32e40p_core
       .id_ready_i(id_ready),
 
       .if_busy_o   (if_busy),
-      .perf_imiss_o(perf_imiss)
+      .perf_imiss_o(perf_imiss),
       .jalmnxti_pc_i   (jalmnxti_pc),  // jump target address from cs_register module
       .jalmnxti_ctrl_i (jalmnxti_ctrl) // jump req from jalmnxti csr
   );
