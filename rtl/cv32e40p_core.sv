@@ -767,6 +767,8 @@ module cv32e40p_core
       .mintstatus_i  (mintstatus),
       .irq_ack_o     (irq_ack),
       .irq_id_o      (irq_id_o),
+      .irq_id_ctrl_o (irq_id_instant), // irq_id_ctrl_o is sent to cs_register
+                                       // module for mnxti csr operation
 
       // Debug Signal
       .debug_mode_o          (debug_mode),
