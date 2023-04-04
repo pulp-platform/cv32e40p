@@ -114,7 +114,7 @@ module cv32e40p_register_file #(
 
   tc_clk_gating CG_WE_GLOBAL (
     .clk_i    (clk),
-    .en_i     (we_a_i | we_b_i,
+    .en_i     (we_a_i | we_b_i),
     .test_en_i(scan_cg_en_i),
     .clk_o    (clk_int)
   );
