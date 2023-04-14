@@ -28,6 +28,7 @@ sources:
     - rtl/include/cv32e40p_apu_core_pkg.sv
     - rtl/include/cv32e40p_fpu_pkg.sv
     - rtl/include/cv32e40p_pkg.sv
+    - rtl/cv32e40p_pulp_clock_gate.sv # Use tc_clk_gate with bender
     - rtl/cv32e40p_alu.sv
     - rtl/cv32e40p_alu_div.sv
     - rtl/cv32e40p_aligner.sv
@@ -60,9 +61,6 @@ sources:
     - target: all(any(verilator, fpga, cv32e40p_use_ff_regfile), not(cv32e40p_use_latch_regfile))
       files:
         - rtl/cv32e40p_register_file_ff.sv
-    - target: rtl
-      files:
-        - bhv/cv32e40p_sim_clock_gate.sv
     - target: all(any(test, cv32e40p_include_tracer), not(cv32e40p_exclude_tracer))
       defines:
         CV32E40P_TRACE_EXECUTION: ~
