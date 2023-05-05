@@ -47,10 +47,11 @@ package cv32e40p_fpu_pkg;
   // | FP16       | IEEE binary16    | 16 bit | 5        | 10
   // | FP8        | binary8          |  8 bit | 5        | 2
   // | FP16ALT    | binary16alt      | 16 bit | 8        | 7
+  // | FP8ALT     | binary8alt       |  8 bit | 4        | 3
   // *NOTE:* Add new formats only at the end of the enumeration for backwards compatibilty!
 
 
-  localparam int unsigned NUM_FP_FORMATS = 5;  // change me to add formats
+  localparam int unsigned NUM_FP_FORMATS = 6;  // change me to add formats
   localparam int unsigned FP_FORMAT_BITS = $clog2(NUM_FP_FORMATS);
 
   // FP formats
@@ -59,7 +60,8 @@ package cv32e40p_fpu_pkg;
     FP64    = 'd1,
     FP16    = 'd2,
     FP8     = 'd3,
-    FP16ALT = 'd4
+    FP16ALT = 'd4,
+    FP8ALT  = 'd5
     // add new formats here
   } fp_format_e;
 
@@ -90,24 +92,14 @@ package cv32e40p_fpu_pkg;
   // FP OPERATIONS
   // --------------
 
-  localparam int unsigned OP_BITS = 4;
+  localparam int unsigned OP_BITS = 5;
 
   typedef enum logic [OP_BITS-1:0] {
-    FMADD,
-    FNMSUB,
-    ADD,
-    MUL,  // ADDMUL operation group
-    DIV,
-    SQRT,  // DIVSQRT operation group
-    SGNJ,
-    MINMAX,
-    CMP,
-    CLASSIFY,  // NONCOMP operation group
-    F2F,
-    F2I,
-    I2F,
-    CPKAB,
-    CPKCD  // CONV operation group
+    SDOTP, EXVSUM, VSUM,         // DOTP operation group
+    FMADD, FNMSUB, ADD, MUL,     // ADDMUL operation group
+    DIV, SQRT,                   // DIVSQRT operation group
+    SGNJ, MINMAX, CMP, CLASSIFY, // NONCOMP operation group
+    F2F, F2I, I2F, CPKAB, CPKCD  // CONV operation group
   } operation_e;
 
 endpackage
