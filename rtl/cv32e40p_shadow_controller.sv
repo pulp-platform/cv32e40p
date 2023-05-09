@@ -17,6 +17,7 @@ module cv32e40p_shadow_controller #(
 ) (
   input logic                   clk_i,
   input logic                   rst_ni,
+  input logic                   setback_i,
   // from/to core controller indicating an interrupt
   input logic                   shadow_irq_i,
   // whether we are ready to process another interrupt (for nesting)
@@ -108,9 +109,15 @@ module cv32e40p_shadow_controller #(
       stack_q      <= '0;
       cnt_q        <= SHADOW_RELOAD;
     end else begin
-      save_state_q <= save_state_d;
-      stack_q      <= stack_d;
-      cnt_q        <= cnt_d;
+      if (setback_i) begin
+        save_state_q <= IDLE;
+        stack_q      <= '0;
+        cnt_q        <= SHADOW_RELOAD;
+      end else begin
+        save_state_q <= save_state_d;
+        stack_q      <= stack_d;
+        cnt_q        <= cnt_d;
+      end
     end
   end
 

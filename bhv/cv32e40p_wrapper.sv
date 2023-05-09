@@ -42,6 +42,7 @@ module cv32e40p_wrapper
     // Clock and Reset
     input logic clk_i,
     input logic rst_ni,
+    input logic setback_i, // Setback signal to reset the core
 
     input logic pulp_clock_en_i,  // PULP clock enable (only used if PULP_CLUSTER = 1)
     input logic scan_cg_en_i,  // Enable all clock gates for testing

@@ -30,6 +30,7 @@ module cv32e40p_prefetch_buffer #(
 ) (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     input logic        req_i,
     input logic        branch_i,
@@ -90,6 +91,7 @@ module cv32e40p_prefetch_buffer #(
   ) prefetch_controller_i (
       .clk  (clk),
       .rst_n(rst_n),
+      .setback_i(setback_i),
 
       .req_i        (req_i),
       .branch_i     (branch_i),
@@ -127,6 +129,7 @@ module cv32e40p_prefetch_buffer #(
   ) fifo_i (
       .clk_i            (clk),
       .rst_ni           (rst_n),
+      .setback_i        (setback_i),
       .flush_i          (fifo_flush),
       .flush_but_first_i(fifo_flush_but_first),
       .testmode_i       (1'b0),
@@ -156,6 +159,7 @@ module cv32e40p_prefetch_buffer #(
   (
       .clk  (clk),
       .rst_n(rst_n),
+      .setback_i(setback_i),
 
       .trans_valid_i(trans_valid),
       .trans_ready_o(trans_ready),

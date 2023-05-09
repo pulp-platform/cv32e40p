@@ -39,6 +39,7 @@ module cv32e40p_register_file #(
     // Clock and Reset
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     input logic scan_cg_en_i,
 
@@ -163,13 +164,17 @@ module cv32e40p_register_file #(
         if (rst_n == 1'b0) begin
           mem[i] <= 32'b0;
         end else begin
-          if (i == 2 && shadow_save_i) begin
-            // shadow register save bumps the stack pointer too
-            // TODO: if a write happens to sp at the same time as a
-            // shadow_save_i request, we might lose the write..
-            mem[i] <= mem[i] - NUM_WORDS_SHADOW * 4;
-          end else if(we_b_dec[i] == 1'b1) mem[i] <= wdata_b_i;
-          else if(we_a_dec[i] == 1'b1) mem[i] <= wdata_a_i;
+          if (setback_i) begin
+            mem[i] <= 32'b0;
+          end else begin
+            if (i == 2 && shadow_save_i) begin
+              // shadow register save bumps the stack pointer too
+              // TODO: if a write happens to sp at the same time as a
+              // shadow_save_i request, we might lose the write..
+              mem[i] <= mem[i] - NUM_WORDS_SHADOW * 4;
+            end else if(we_b_dec[i] == 1'b1) mem[i] <= wdata_b_i;
+            else if(we_a_dec[i] == 1'b1) mem[i] <= wdata_a_i;
+          end
         end
       end
 
@@ -179,9 +184,17 @@ module cv32e40p_register_file #(
       // Floating point registers
       for (l = 0; l < NUM_FP_WORDS; l++) begin
         always_ff @(posedge clk, negedge rst_n) begin : fp_regs
-          if (rst_n == 1'b0) mem_fp[l] <= '0;
-          else if (we_b_dec[l+NUM_WORDS] == 1'b1) mem_fp[l] <= wdata_b_i;
-          else if (we_a_dec[l+NUM_WORDS] == 1'b1) mem_fp[l] <= wdata_a_i;
+          if (rst_n == 1'b0) begin
+            mem_fp[l] <= '0;
+          end else begin
+            if (setback_i) begin
+              mem_fp[l] <= '0;
+            end else if (we_b_dec[l+NUM_WORDS] == 1'b1) begin
+              mem_fp[l] <= wdata_b_i;
+            end else if (we_a_dec[l+NUM_WORDS] == 1'b1) begin
+              mem_fp[l] <= wdata_a_i;
+            end
+          end
         end
       end
     end else begin : gen_no_mem_fp_write
@@ -234,34 +247,38 @@ if (SHADOW) begin: gen_shadow_save
       if(~rst_n) begin
         mem_shadow <= '0;
       end else begin
-        if (shadow_save_i) begin
-          if (ABI == "standard") begin : gen_reg_standard
-            // save standard caller save registers
-            mem_shadow[0] <= mem[1];
-            mem_shadow[1] <= mem[5];
-            mem_shadow[2] <= mem[6];
-            mem_shadow[3] <= mem[7];
-            mem_shadow[4] <= mem[10];
-            mem_shadow[5] <= mem[11];
-            mem_shadow[6] <= mem[12];
-            mem_shadow[7] <= mem[13];
-            mem_shadow[8] <= mem[14];
-            mem_shadow[9] <= mem[15];
-            mem_shadow[10] <= mem[16];
-            mem_shadow[11] <= mem[17];
-            mem_shadow[12] <= mem[28];
-            mem_shadow[13] <= mem[29];
-            mem_shadow[14] <= mem[30];
-            mem_shadow[15] <= mem[31];
-          end else if (ABI == "eabi") begin : gen_reg_eabi
-            // save eabi caller save registers
-            mem_shadow[0] <= mem[1];
-            mem_shadow[1] <= mem[5];
-            mem_shadow[2] <= mem[10];
-            mem_shadow[3] <= mem[11];
-            mem_shadow[4] <= mem[12];
-            mem_shadow[5] <= mem[13];
-            mem_shadow[6] <= mem[15];
+        if (setback_i) begin
+          mem_shadow <= '0;
+        end else begin
+          if (shadow_save_i) begin
+            if (ABI == "standard") begin : gen_reg_standard
+              // save standard caller save registers
+              mem_shadow[0] <= mem[1];
+              mem_shadow[1] <= mem[5];
+              mem_shadow[2] <= mem[6];
+              mem_shadow[3] <= mem[7];
+              mem_shadow[4] <= mem[10];
+              mem_shadow[5] <= mem[11];
+              mem_shadow[6] <= mem[12];
+              mem_shadow[7] <= mem[13];
+              mem_shadow[8] <= mem[14];
+              mem_shadow[9] <= mem[15];
+              mem_shadow[10] <= mem[16];
+              mem_shadow[11] <= mem[17];
+              mem_shadow[12] <= mem[28];
+              mem_shadow[13] <= mem[29];
+              mem_shadow[14] <= mem[30];
+              mem_shadow[15] <= mem[31];
+            end else if (ABI == "eabi") begin : gen_reg_eabi
+              // save eabi caller save registers
+              mem_shadow[0] <= mem[1];
+              mem_shadow[1] <= mem[5];
+              mem_shadow[2] <= mem[10];
+              mem_shadow[3] <= mem[11];
+              mem_shadow[4] <= mem[12];
+              mem_shadow[5] <= mem[13];
+              mem_shadow[6] <= mem[15];
+            end
           end
         end
       end
@@ -272,9 +289,14 @@ if (SHADOW) begin: gen_shadow_save
       shadow_mepc   <= '0;
       shadow_mcause <= '0;
     end else begin
-      if (shadow_csr_save_i) begin
-        shadow_mepc   <= shadow_mepc_i;
-        shadow_mcause <= shadow_mcause_i;
+      if (setback_i) begin
+        shadow_mepc   <= '0;
+        shadow_mcause <= '0;
+      end else begin
+        if (shadow_csr_save_i) begin
+          shadow_mepc   <= shadow_mepc_i;
+          shadow_mcause <= shadow_mcause_i;
+        end
       end
     end
   end

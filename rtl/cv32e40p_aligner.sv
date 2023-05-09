@@ -23,6 +23,7 @@
 module cv32e40p_aligner (
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     input  logic fetch_valid_i,
     output logic aligner_ready_o,  //prevents overwriting the fethced instruction
@@ -72,18 +73,27 @@ module cv32e40p_aligner (
       aligner_ready_q  <= 1'b0;
       hwlp_update_pc_q <= 1'b0;
     end else begin
-      if (update_state) begin
-        pc_q             <= pc_n;
-        state            <= next_state;
-        r_instr_h        <= fetch_rdata_i[31:16];
-        aligner_ready_q  <= aligner_ready_o;
+      if (setback_i) begin
+        state            <= ALIGNED32;
+        r_instr_h        <= '0;
+        hwlp_addr_q      <= '0;
+        pc_q             <= '0;
+        aligner_ready_q  <= 1'b0;
         hwlp_update_pc_q <= 1'b0;
       end else begin
-        if (hwlp_update_pc_i) begin
-          hwlp_addr_q      <= hwlp_addr_i;  // Save the JUMP target address to keep pc_n up to date during the stall
-          hwlp_update_pc_q <= 1'b1;
-        end
+        if (update_state) begin
+          pc_q             <= pc_n;
+          state            <= next_state;
+          r_instr_h        <= fetch_rdata_i[31:16];
+          aligner_ready_q  <= aligner_ready_o;
+          hwlp_update_pc_q <= 1'b0;
+        end else begin
+          if (hwlp_update_pc_i) begin
+            hwlp_addr_q      <= hwlp_addr_i;  // Save the JUMP target address to keep pc_n up to date during the stall
+            hwlp_update_pc_q <= 1'b1;
+          end
 
+        end
       end
     end
   end

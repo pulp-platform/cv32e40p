@@ -59,6 +59,7 @@ module cv32e40p_sleep_unit #(
     // Clock, reset interface
     input  logic clk_ungated_i,  // Free running clock
     input  logic rst_n,
+    input logic setback_i,
     output logic clk_gated_o,  // Gated clock
     input  logic scan_cg_en_i,  // Enable all clock gates for testing
 
@@ -141,9 +142,15 @@ module cv32e40p_sleep_unit #(
       p_elw_busy_q   <= 1'b0;
       fetch_enable_q <= 1'b0;
     end else begin
-      core_busy_q    <= core_busy_d;
-      p_elw_busy_q   <= p_elw_busy_d;
-      fetch_enable_q <= fetch_enable_d;
+      if (setback_i) begin
+        core_busy_q    <= 1'b0;
+        p_elw_busy_q   <= 1'b0;
+        fetch_enable_q <= 1'b0;
+      end else begin
+        core_busy_q    <= core_busy_d;
+        p_elw_busy_q   <= p_elw_busy_d;
+        fetch_enable_q <= fetch_enable_d;
+      end
     end
   end
 

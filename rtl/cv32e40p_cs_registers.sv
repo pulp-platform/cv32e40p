@@ -52,6 +52,7 @@ module cv32e40p_cs_registers
     // Clock and Reset
     input logic clk,
     input logic rst_n,
+    input logic setback_i,
 
     // Hart ID
     input  logic [31:0] hart_id_i,
@@ -1632,8 +1633,13 @@ end //PULP_SECURE = 0
             pmp_reg_q.pmpcfg[j]  <= '0;
             pmp_reg_q.pmpaddr[j] <= '0;
           end else begin
-            if (pmpcfg_we[j]) pmp_reg_q.pmpcfg[j] <= USE_PMP ? pmp_reg_n.pmpcfg[j] : '0;
-            if (pmpaddr_we[j]) pmp_reg_q.pmpaddr[j] <= USE_PMP ? pmp_reg_n.pmpaddr[j] : '0;
+            if (setback_i) begin
+              pmp_reg_q.pmpcfg[j]  <= '0;
+              pmp_reg_q.pmpaddr[j] <= '0;
+            end else begin
+              if (pmpcfg_we[j]) pmp_reg_q.pmpcfg[j] <= USE_PMP ? pmp_reg_n.pmpcfg[j] : '0;
+              if (pmpaddr_we[j]) pmp_reg_q.pmpaddr[j] <= USE_PMP ? pmp_reg_n.pmpaddr[j] : '0;
+            end
           end
         end
       end  //CS_PMP_REGS_FF
@@ -1647,12 +1653,21 @@ end //PULP_SECURE = 0
           utvt_q       <= '0;
           priv_lvl_q   <= PRIV_LVL_M;
         end else begin
-          uepc_q       <= uepc_n;
-          ucause_q     <= ucause_n;
-          utvec_q      <= utvec_n;
-          utvec_mode_q <= utvec_mode_n;
-          utvt_q       <= '0;
-          priv_lvl_q   <= priv_lvl_n;
+          if (setback_i) begin
+            uepc_q       <= '0;
+            ucause_q     <= '0;
+            utvec_q      <= '0;
+            utvec_mode_q <= MTVEC_MODE;
+            utvt_q       <= '0;
+            priv_lvl_q   <= PRIV_LVL_M;
+          end else begin
+            uepc_q       <= uepc_n;
+            ucause_q     <= ucause_n;
+            utvec_q      <= utvec_n;
+            utvec_mode_q <= utvec_mode_n;
+            utvt_q       <= '0;
+            priv_lvl_q   <= priv_lvl_n;
+          end
         end
       end
     end else begin : gen_no_pmp_user
@@ -1707,51 +1722,90 @@ end //PULP_SECURE = 0
       irq_shv_q        <= '0;
       irq_q            <= '0;
       irq_ack_mnxti_q  <= '0;
-    end
-    else
-    begin
-      // update CSRs
-      if (FPU == 1) begin
-        frm_q    <= frm_n;
-        fflags_q <= fflags_n;
-      end else begin
-        frm_q    <= 'b0;
-        fflags_q <= 'b0;
-      end
-      if (PULP_SECURE == 1) begin
-        mstatus_q <= mstatus_n;
-      end else begin
+    end else begin
+      if (setback_i) begin
+        frm_q <= '0;
+        fflags_q <= '0;
         mstatus_q  <= '{
                 uie:  1'b0,
-                mie:  mstatus_n.mie,
+                mie:  1'b0,
                 upie: 1'b0,
-                mpie: mstatus_n.mpie,
+                mpie: 1'b0,
                 mpp:  PRIV_LVL_M,
                 mprv: 1'b0
               };
+        mepc_q <= '0;
+        mcause_q <= '0;
+
+        depc_q <= '0;
+        dcsr_q         <= '{
+            xdebugver: XDEBUGVER_STD,
+            cause:     DBG_CAUSE_NONE, // 3'h0
+            prv:       PRIV_LVL_M,
+            default:   '0
+        };
+        dscratch0_q    <= '0;
+        dscratch1_q    <= '0;
+        mscratch_q     <= '0;
+        mie_q          <= '0;
+        mtvec_q        <= '0;
+        mtvt_q         <= '0;
+        mtvec_mode_q   <= MTVEC_MODE;
+        mintthresh_q   <= '0;
+        mintstatus_q   <= '0;
+        mpil_q         <= '0;
+        minhv_q        <= '0;
+        shwint_q       <= '0;
+        // vairables for mnxti csr
+        irq_id_instant_q <= '0;
+        irq_level_q      <= '0;
+        irq_shv_q        <= '0;
+        irq_q            <= '0;
+        irq_ack_mnxti_q  <= '0;
+      end else begin
+        // update CSRs
+        if (FPU == 1) begin
+          frm_q    <= frm_n;
+          fflags_q <= fflags_n;
+        end else begin
+          frm_q    <= 'b0;
+          fflags_q <= 'b0;
+        end
+        if (PULP_SECURE == 1) begin
+          mstatus_q <= mstatus_n;
+        end else begin
+          mstatus_q  <= '{
+                  uie:  1'b0,
+                  mie:  mstatus_n.mie,
+                  upie: 1'b0,
+                  mpie: mstatus_n.mpie,
+                  mpp:  PRIV_LVL_M,
+                  mprv: 1'b0
+                };
+        end
+        mepc_q         <= mepc_n;
+        mcause_q       <= mcause_n;
+        depc_q         <= depc_n;
+        dcsr_q         <= dcsr_n;
+        dscratch0_q    <= dscratch0_n;
+        dscratch1_q    <= dscratch1_n;
+        mscratch_q     <= mscratch_n;
+        mie_q          <= mie_n;
+        mtvec_q        <= mtvec_n;
+        mtvt_q         <= mtvt_n;
+        mtvec_mode_q   <= mtvec_mode_n;
+        mintthresh_q   <= mintthresh_n;
+        mintstatus_q   <= mintstatus_n;
+        mpil_q         <= mpil_n;
+        minhv_q        <= minhv_n;
+        shwint_q       <= shwint_n;
+        // vairables for mnxti csr
+        irq_id_instant_q <= irq_id_instant_n;
+        irq_level_q      <= irq_level_n;
+        irq_shv_q        <= irq_shv_n;
+        irq_q            <= irq_n;
+        irq_ack_mnxti_q  <= irq_ack_mnxti_n;
       end
-      mepc_q         <= mepc_n;
-      mcause_q       <= mcause_n;
-      depc_q         <= depc_n;
-      dcsr_q         <= dcsr_n;
-      dscratch0_q    <= dscratch0_n;
-      dscratch1_q    <= dscratch1_n;
-      mscratch_q     <= mscratch_n;
-      mie_q          <= mie_n;
-      mtvec_q        <= mtvec_n;
-      mtvt_q         <= mtvt_n;
-      mtvec_mode_q   <= mtvec_mode_n;
-      mintthresh_q   <= mintthresh_n;
-      mintstatus_q   <= mintstatus_n;
-      mpil_q         <= mpil_n;
-      minhv_q        <= minhv_n;
-      shwint_q       <= shwint_n;
-      // vairables for mnxti csr
-      irq_id_instant_q <= irq_id_instant_n;
-      irq_level_q      <= irq_level_n;
-      irq_shv_q        <= irq_shv_n;
-      irq_q            <= irq_n;
-      irq_ack_mnxti_q  <= irq_ack_mnxti_n;
     end
   end
   ////////////////////////////////////////////////////////////////////////
@@ -1782,8 +1836,13 @@ end //PULP_SECURE = 0
         tmatch_control_exec_q <= 'b0;
         tmatch_value_q        <= 'b0;
       end else begin
-        if (tmatch_control_we) tmatch_control_exec_q <= csr_wdata_int[2];
-        if (tmatch_value_we) tmatch_value_q <= csr_wdata_int[31:0];
+        if (setback_i) begin
+          tmatch_control_exec_q <= 'b0;
+          tmatch_value_q        <= 'b0;
+        end else begin
+          if (tmatch_control_we) tmatch_control_exec_q <= csr_wdata_int[2];
+          if (tmatch_value_we) tmatch_value_q <= csr_wdata_int[31:0];
+        end
       end
     end
 
@@ -1981,15 +2040,19 @@ end //PULP_SECURE = 0
           if (!rst_n) begin
             mhpmcounter_q[cnt_gidx] <= 'b0;
           end else begin
-            if (PULP_PERF_COUNTERS && (cnt_gidx == 2 || cnt_gidx == 0)) begin
+            if (setback_i) begin
               mhpmcounter_q[cnt_gidx] <= 'b0;
             end else begin
-              if (mhpmcounter_write_lower[cnt_gidx]) begin
-                mhpmcounter_q[cnt_gidx][31:0] <= csr_wdata_int;
-              end else if (mhpmcounter_write_upper[cnt_gidx]) begin
-                mhpmcounter_q[cnt_gidx][63:32] <= csr_wdata_int;
-              end else if (mhpmcounter_write_increment[cnt_gidx]) begin
-                mhpmcounter_q[cnt_gidx] <= mhpmcounter_increment[cnt_gidx];
+              if (PULP_PERF_COUNTERS && (cnt_gidx == 2 || cnt_gidx == 0)) begin
+                mhpmcounter_q[cnt_gidx] <= 'b0;
+              end else begin
+                if (mhpmcounter_write_lower[cnt_gidx]) begin
+                  mhpmcounter_q[cnt_gidx][31:0] <= csr_wdata_int;
+                end else if (mhpmcounter_write_upper[cnt_gidx]) begin
+                  mhpmcounter_q[cnt_gidx][63:32] <= csr_wdata_int;
+                end else if (mhpmcounter_write_increment[cnt_gidx]) begin
+                  mhpmcounter_q[cnt_gidx] <= mhpmcounter_increment[cnt_gidx];
+                end
               end
             end
           end
@@ -2008,10 +2071,17 @@ end //PULP_SECURE = 0
         if (NUM_HPM_EVENTS < 32) begin : gen_tie_off
           assign mhpmevent_q[evt_gidx][31:NUM_HPM_EVENTS] = 'b0;
         end
-        always_ff @(posedge clk, negedge rst_n)
-          if (!rst_n) mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= 'b0;
-          else
-            mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= mhpmevent_n[evt_gidx][NUM_HPM_EVENTS-1:0];
+        always_ff @(posedge clk, negedge rst_n) begin
+          if (!rst_n) begin
+            mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= 'b0;
+          end else begin
+            if (setback_i) begin
+              mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= 'b0;
+            end else begin
+              mhpmevent_q[evt_gidx][NUM_HPM_EVENTS-1:0] <= mhpmevent_n[evt_gidx][NUM_HPM_EVENTS-1:0];
+            end
+          end
+        end
       end
     end
   endgenerate
@@ -2026,9 +2096,17 @@ end //PULP_SECURE = 0
         begin : gen_non_implemented
         assign mcounteren_q[en_gidx] = 'b0;
       end else begin : gen_implemented
-        always_ff @(posedge clk, negedge rst_n)
-          if (!rst_n) mcounteren_q[en_gidx] <= 'b0;  // default disable
-          else mcounteren_q[en_gidx] <= mcounteren_n[en_gidx];
+        always_ff @(posedge clk, negedge rst_n) begin
+          if (!rst_n) begin
+            mcounteren_q[en_gidx] <= 'b0;  // default disable
+          end else begin
+            if (setback_i) begin
+              mcounteren_q[en_gidx] <= 'b0;  // default disable
+            end else begin
+              mcounteren_q[en_gidx] <= mcounteren_n[en_gidx];
+            end
+          end
+        end
       end
     end
   endgenerate
@@ -2041,9 +2119,17 @@ end //PULP_SECURE = 0
       if ((inh_gidx == 1) || (inh_gidx >= (NUM_MHPMCOUNTERS + 3))) begin : gen_non_implemented
         assign mcountinhibit_q[inh_gidx] = 'b0;
       end else begin : gen_implemented
-        always_ff @(posedge clk, negedge rst_n)
-          if (!rst_n) mcountinhibit_q[inh_gidx] <= 'b1;  // default disable
-          else mcountinhibit_q[inh_gidx] <= mcountinhibit_n[inh_gidx];
+        always_ff @(posedge clk, negedge rst_n) begin
+          if (!rst_n) begin
+            mcountinhibit_q[inh_gidx] <= 'b1;  // default disable
+          end else begin
+            if (setback_i) begin
+              mcountinhibit_q[inh_gidx] <= 'b1;  // default disable
+            end else begin
+              mcountinhibit_q[inh_gidx] <= mcountinhibit_n[inh_gidx];
+            end
+          end
+        end
       end
     end
   endgenerate
