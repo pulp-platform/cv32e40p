@@ -430,21 +430,23 @@ module riscv_ex_stage
             Width:         C_FLEN,
             EnableVectors: C_XFVEC,
             EnableNanBox:  1'b0,
-            FpFmtMask:     {C_RVF, C_RVD, C_XF16, C_XF8, C_XF16ALT},
-            IntFmtMask:    {C_XFVEC && C_XF8, C_XFVEC && (C_XF16 || C_XF16ALT), 1'b1, 1'b0}
+            FpFmtMask:     {C_RVF, C_RVD, C_XF16, C_XF8, C_XF16ALT, C_XF8ALT},
+            IntFmtMask:    {C_XFVEC && (C_XF8 || C_XF8ALT), C_XFVEC && (C_XF16 || C_XF16ALT), 1'b1, 1'b0}
           };
 
           // Implementation (number of registers etc)
           localparam fpnew_pkg::fpu_implementation_t FPU_IMPLEMENTATION = '{
             PipeRegs:  '{// FP32, FP64, FP16, FP8, FP16alt
-                         '{C_LAT_FP32, C_LAT_FP64, C_LAT_FP16, C_LAT_FP8, C_LAT_FP16ALT}, // ADDMUL
+                         '{C_LAT_FP32, C_LAT_FP64, C_LAT_FP16, C_LAT_FP8, C_LAT_FP16ALT, C_LAT_FP8ALT}, // ADDMUL
                          '{default: C_LAT_DIVSQRT}, // DIVSQRT
                          '{default: C_LAT_NONCOMP}, // NONCOMP
-                         '{default: C_LAT_CONV}},   // CONV
+                         '{default: C_LAT_CONV},    // CONV
+                         '{default: C_LAT_DOTP}},   // SDOTP
             UnitTypes: '{'{default: fpnew_pkg::MERGED}, // ADDMUL
                          '{default: C_DIV},               // DIVSQRT
                          '{default: fpnew_pkg::PARALLEL}, // NONCOMP
-                         '{default: fpnew_pkg::MERGED}},  // CONV
+                         '{default: fpnew_pkg::MERGED},   // CONV
+                         '{default: fpnew_pkg::DISABLED}}, // SDOTP
             PipeConfig: fpnew_pkg::AFTER
           };
 
@@ -459,6 +461,7 @@ module riscv_ex_stage
           ) i_fpnew_bulk (
             .clk_i          ( clk                                   ),
             .rst_ni         ( rst_n                                 ),
+            .hart_id_i      ( '0                                    ),
             .operands_i     ( apu_operands_i                        ),
             .rnd_mode_i     ( fpnew_pkg::roundmode_e'(fp_rnd_mode)  ),
             .op_i           ( fpnew_pkg::operation_e'(fpu_op)       ),
@@ -468,6 +471,7 @@ module riscv_ex_stage
             .int_fmt_i      ( fpnew_pkg::int_format_e'(fpu_int_fmt) ),
             .vectorial_op_i ( fpu_vec_op                            ),
             .tag_i          ( 1'b0                                  ),
+            .simd_mask_i    ( '1                                    ),
             .in_valid_i     ( apu_req                               ),
             .in_ready_o     ( FPU_ready_int                         ),
             .flush_i        ( 1'b0                                  ),

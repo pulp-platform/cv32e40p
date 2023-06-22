@@ -386,6 +386,7 @@ parameter bit C_RVD = 1'b0; // Is D extension enabled - NOT SUPPORTED CURRENTLY
 parameter bit C_XF16    = 1'b0; // Is half-precision float extension (Xf16) enabled
 parameter bit C_XF16ALT = 1'b0; // Is alternative half-precision float extension (Xf16alt) enabled
 parameter bit C_XF8     = 1'b0; // Is quarter-precision float extension (Xf8) enabled
+parameter bit C_XF8ALT  = 1'b0; // Is quarter-precision float extension (Xf8alt) enabled
 parameter bit C_XFVEC   = 1'b0; // Is vectorial float extension (Xfvec) enabled
 
 // FPnew configuration
@@ -399,9 +400,11 @@ parameter int unsigned C_LAT_FP32       = 'd1;
 parameter int unsigned C_LAT_FP16       = 'd1;
 parameter int unsigned C_LAT_FP16ALT    = 'd1;
 parameter int unsigned C_LAT_FP8        = 'd1;
+parameter int unsigned C_LAT_FP8ALT     = 'd1;
 parameter int unsigned C_LAT_DIVSQRT    = 'd2; // divsqrt post-processing pipe
 parameter int unsigned C_LAT_CONV       = 'd1;
 parameter int unsigned C_LAT_NONCOMP    = 'd1;
+parameter int unsigned C_LAT_DOTP       = 'd1;
 
 // General FPU-specific defines
 
@@ -411,6 +414,7 @@ parameter C_FLEN = C_RVD     ? 64 : // D ext.
                    C_XF16    ? 16 : // Xf16 ext.
                    C_XF16ALT ? 16 : // Xf16alt ext.
                    C_XF8     ? 8 :  // Xf8 ext.
+                   C_XF8ALT  ? 8 :  // Xf8alt ext.
                    0;               // Unused in case of no FP
 
 parameter C_FFLAG             = 5;
