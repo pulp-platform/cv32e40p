@@ -27,22 +27,20 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-module cv32e40p_cs_registers
-  import cv32e40p_pkg::*;
-#(
-    parameter N_HWLP           = 2,
-    parameter N_HWLP_BITS      = $clog2(N_HWLP),
-    parameter APU              = 0,
-    parameter A_EXTENSION      = 0,
-    parameter FPU              = 0,
-    parameter PULP_SECURE      = 0,
-    parameter USE_PMP          = 0,
-    parameter N_PMP_ENTRIES    = 16,
-    parameter NUM_MHPMCOUNTERS = 1,
-    parameter NUM_EXTERNAL_PERF = 0,
-    parameter PULP_XPULP       = 0,
-    parameter PULP_CLUSTER     = 0,
-    parameter DEBUG_TRIGGER_EN = 1
+module cv32e40p_cs_registers import cv32e40p_pkg::*; #(
+    parameter int unsigned N_HWLP           = 2,
+    parameter int unsigned N_HWLP_BITS      = $clog2(N_HWLP),
+    parameter int unsigned APU              = 0,
+    parameter int unsigned A_EXTENSION      = 0,
+    parameter int unsigned FPU              = 0,
+    parameter int unsigned PULP_SECURE      = 0,
+    parameter int unsigned USE_PMP          = 0,
+    parameter int unsigned N_PMP_ENTRIES    = 16,
+    parameter int unsigned NUM_MHPMCOUNTERS = 1,
+    parameter int unsigned NUM_EXTERNAL_PERF = 0,
+    parameter int unsigned PULP_XPULP       = 0,
+    parameter int unsigned PULP_CLUSTER     = 0,
+    parameter int unsigned DEBUG_TRIGGER_EN = 1
 ) (
     // Clock and Reset
     input logic clk,
