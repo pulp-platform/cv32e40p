@@ -57,8 +57,10 @@ RTLSRC_FPNEW_TB		:= $(wildcard *.sv)
 RTLSRC_FPNEW_INCDIR	:= $(RTLSRC_HOME)/rtl/fpnew/src/common_cells/include
 RTLSRC_FPNEW_PKG	:= $(RTLSRC_HOME)/rtl/fpnew/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv $(RTLSRC_HOME)/rtl/fpnew/src/fpnew_pkg.sv $(RTLSRC_HOME)/rtl/fpnew/src/common_cells/src/cf_math_pkg.sv
 RTLSRC_FPNEW		:= $(filter-out $(RTLSRC_HOME)/rtl/fpnew/src/fpnew_pkg.sv, $(wildcard $(RTLSRC_HOME)/rtl/fpnew/src/*.sv)) \
-				$(filter-out $(RTLSRC_HOME)/rtl/fpnew/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv, $(wildcard $(RTLSRC_HOME)/rtl/fpnew/src/fpu_div_sqrt_mvp/hdl/*.sv)) \
-				 $(RTLSRC_HOME)/rtl/fpnew/src//common_cells/src/rr_arb_tree.sv  $(RTLSRC_HOME)/rtl/fpnew/src/common_cells/src/lzc.sv
+				 $(filter-out $(RTLSRC_HOME)/rtl/fpnew/src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv, $(wildcard $(RTLSRC_HOME)/rtl/fpnew/src/fpu_div_sqrt_mvp/hdl/*.sv)) \
+				 $(RTLSRC_HOME)/rtl/fpnew/src//common_cells/src/rr_arb_tree.sv  $(RTLSRC_HOME)/rtl/fpnew/src/common_cells/src/lzc.sv \
+				 $(RTLSRC_HOME)/rtl/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v $(wildcard $(RTLSRC_HOME)/rtl/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/*.v) \
+				 $(wildcard $(RTLSRC_HOME)/rtl/fpnew/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/*.v)
 
 RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
 RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
@@ -66,6 +68,7 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 # riscv toolchain install path
 RISCV                    ?= ~/.riscv
 RISCV_EXE_PREFIX         = $(RISCV)/bin/riscv32-unknown-elf-
+
 
 # assume vsim if no target chosen
 .DEFAULT_GOAL := custom-vsim-run
@@ -100,7 +103,7 @@ check_fpnew_deps:
 	@if [ ! -d ../../rtl/fpnew ]; then echo Please run \'make fpnew_deps\' first to clone the required fpnew repos; exit 1; fi
 
 fpnew_deps:
-	if [ ! -d ../../rtl/fpnew ]; then git clone https://github.com/pulp-platform/fpnew ../../rtl/fpnew --recurse; fi
+	if [ ! -d ../../rtl/fpnew ]; then git clone https://github.com/pulp-platform/cvfpu -b pulp-v0.1.3 ../../rtl/fpnew --recurse; fi
 
 # rebuild if we change some sourcefile
 .build-rtl-fp: .lib-rtl $(RTLSRC_FPNEW_PKG) $(RTLSRC_FPNEW) $(CV_CORE_MANIFEST) $(RTLSRC_TB_PKG) $(RTLSRC_FPNEW_TB)
