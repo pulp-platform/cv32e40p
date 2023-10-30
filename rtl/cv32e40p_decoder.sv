@@ -2774,7 +2774,8 @@ module cv32e40p_decoder import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*;
               CSR_MINTSTATUS,
               CSR_MSHWINT,
               CSR_MNXTI,
-              CSR_JALMNXTI:
+              CSR_JALMNXTI,
+              CSR_MNXTICFG:
                 // Not illegal, but treat as status CSR for side effect handling
                 csr_status_o = 1'b1;
 

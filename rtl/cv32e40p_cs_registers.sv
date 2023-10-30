@@ -94,6 +94,7 @@ module cv32e40p_cs_registers
     output logic        irq_ack_mnxti_o,                        // give a pulse signal when mnxti csr take an interrupt
     output logic        jalmnxti_ctrl_o,
     output logic [31:0] jalmnxti_pc_o,
+    output logic        mnxti_en_o,
 
     //csr_irq_sec_i is always 0 if PULP_SECURE is zero
     input  logic        csr_irq_sec_i,
@@ -362,6 +363,7 @@ logic                              irq_shv_n, irq_shv_q;
 logic [NUM_INTERRUPTS-1:0]         irq_n, irq_q;
 logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_instant_n, irq_id_instant_q;
 logic                              irq_ack_mnxti_n, irq_ack_mnxti_q;
+logic                              mnxti_cfg_en_n, mnxti_cfg_en_q;
 
 assign irq_level_n      = irq_level_i;
 assign irq_shv_n        = irq_shv_i;
@@ -475,6 +477,8 @@ assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ?
             csr_rdata_int = '0;
           end
         end
+        // mnxti config CSR
+        CSR_MNXTICFG: csr_rdata_int = mnxti_cfg_en_q;
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
         CSR_MCAUSE:
@@ -702,6 +706,8 @@ assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ?
             csr_rdata_int = '0;
           end
         end
+        // mnxti config CSR
+        CSR_MNXTICFG: csr_rdata_int = mnxti_cfg_en_q;
         // mepc: exception program counter
         CSR_MEPC: csr_rdata_int = mepc_q;
         // mcause: exception cause
@@ -970,6 +976,10 @@ assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ?
               mcause_n[$clog2(NUM_INTERRUPTS)-1:0] = mcause_q[$clog2(NUM_INTERRUPTS)-1:0];
             end
           end
+        end
+        // mnxti config CSR
+        CSR_MNXTICFG: if (csr_we_int) begin
+          mnxti_cfg_en_n = csr_wdata_int[0];
         end
         // mepc: exception program counter
         CSR_MEPC: if (csr_we_int) begin
@@ -1395,6 +1405,10 @@ assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ?
             end
           end
         end
+        // mnxti config CSR
+        CSR_MNXTICFG: if (csr_we_int) begin
+          mnxti_cfg_en_n = csr_wdata_int[0];
+        end
         // mepc: exception program counter
         CSR_MEPC: if (csr_we_int) begin
           mepc_n = csr_wdata_int & ~32'b1; // force 16-bit alignment
@@ -1619,6 +1633,8 @@ end //PULP_SECURE = 0
   assign shadow_runahead_o = shwint_q.runahead;
   assign shadow_block_lw_o = shwint_q.blocklw;
 
+  assign mnxti_en_o        = mnxti_cfg_en_q;
+
   generate
     if (PULP_SECURE == 1) begin : gen_pmp_user
 
@@ -1762,6 +1778,7 @@ end //PULP_SECURE = 0
         irq_shv_q        <= '0;
         irq_q            <= '0;
         irq_ack_mnxti_q  <= '0;
+        mnxti_cfg_en_q   <= '0;
       end else begin
         // update CSRs
         if (FPU == 1) begin
@@ -1805,6 +1822,7 @@ end //PULP_SECURE = 0
         irq_shv_q        <= irq_shv_n;
         irq_q            <= irq_n;
         irq_ack_mnxti_q  <= irq_ack_mnxti_n;
+        mnxti_cfg_en_q   <= mnxti_cfg_en_n;
       end
     end
   end

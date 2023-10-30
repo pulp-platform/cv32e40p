@@ -341,6 +341,7 @@ module cv32e40p_core
   logic [$clog2(NUM_INTERRUPTS)-1:0] irq_id_instant; // the interrupt id calculated by id_stage module is sent to cs_register module for mnxti operation
   logic        jalmnxti_ctrl;    // jump req signal sent by cs_register module for jalmnxti csr
   logic [31:0] jalmnxti_pc;      // jump target address sent by cs_register module for jalmnxti csr
+  logic        mnxti_en;
 
   // shadow
   logic                            shadow_en;
@@ -427,7 +428,7 @@ module cv32e40p_core
   // or cs_register module under non-vectoring mode. Since mnxti CSR need the information
   // of the taken interrupt for further operation, the non-vectoring interrupt taken by
   // the core cannot be acknowledged and thus cleared immediately
-  assign irq_ack_o = (CLIC_SHV && irq_shv_i) ? irq_ack : irq_ack_mnxti;
+  assign irq_ack_o = (CLIC_SHV && (irq_shv_i || !mnxti_en )) ? irq_ack : irq_ack_mnxti;
 
 
   //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1094,6 +1095,7 @@ module cv32e40p_core
       .irq_ack_mnxti_o (irq_ack_mnxti),  // interrupt acknowledge signal sent by mnxti csr
       .jalmnxti_ctrl_o (jalmnxti_ctrl),  // jump req signal sent by jalmnxti csr
       .jalmnxti_pc_o (jalmnxti_pc),      // jump target address sent by jalmnxti csr
+      .mnxti_en_o    (mnxti_en),         // whether the mnxti feature is enabled
       .csr_irq_sec_i (csr_irq_sec),
       .sec_lvl_o     (sec_lvl_o),
       .mepc_o        (mepc),
