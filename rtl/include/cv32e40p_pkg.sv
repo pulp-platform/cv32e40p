@@ -339,7 +339,7 @@ package cv32e40p_pkg;
     // CSR_MSCRATCHCSW    = 12'h348,
     // CSR_MSCRATCHCSWL   = 12'h349,
     CSR_MCLICBASE      = 12'h350,
-    CSR_JALMNXTI       = 12'h351, // customized csr
+    CSR_JALMNXTI       = 12'hBCF, // customized csr
     CSR_MNXTICFG       = 12'hBD0, // customized csr
 
     // Physical memory protection (PMP)
