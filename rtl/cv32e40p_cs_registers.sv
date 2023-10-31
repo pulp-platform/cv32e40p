@@ -878,6 +878,8 @@ assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ?
       jalmnxti_ctrl_o         = '0;
       jalmnxti_pc_o           = '0;
 
+      mnxti_cfg_en_n          = mnxti_cfg_en_q;
+
       if (FPU == 1) if (fflags_we_i) fflags_n = fflags_i | fflags_q;
 
       case (csr_addr_i)
@@ -1305,6 +1307,8 @@ assign mnxti_pass = (irq_q) && CLIC && (irq_level_q > ((mpil_q > mintthresh_q) ?
       irq_ack_mnxti_n = '0; // to ensure that irq_ack_mnxti_o is a pulse 
       jalmnxti_ctrl_o = '0;
       jalmnxti_pc_o = '0;
+
+      mnxti_cfg_en_n = mnxti_cfg_en_q;
 
       if (FPU == 1) if (fflags_we_i) fflags_n = fflags_i | fflags_q;
 
