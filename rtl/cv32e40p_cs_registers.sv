@@ -1742,6 +1742,7 @@ end //PULP_SECURE = 0
       irq_shv_q        <= '0;
       irq_q            <= '0;
       irq_ack_mnxti_q  <= '0;
+      mnxti_cfg_en_q   <= '0;
     end else begin
       if (setback_i) begin
         frm_q <= '0;
