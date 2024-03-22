@@ -371,9 +371,9 @@ module cv32e40p_id_stage
   logic [1:0] mult_dot_signed;  // Signed mode dot products (can be mixed types)
 
   // FPU signals
-  logic [cv32e40p_fpu_pkg::FP_FORMAT_BITS-1:0] fpu_src_fmt;
-  logic [cv32e40p_fpu_pkg::FP_FORMAT_BITS-1:0] fpu_dst_fmt;
-  logic [cv32e40p_fpu_pkg::INT_FORMAT_BITS-1:0] fpu_int_fmt;
+  logic [fpnew_pkg::FP_FORMAT_BITS-1:0] fpu_src_fmt;
+  logic [fpnew_pkg::FP_FORMAT_BITS-1:0] fpu_dst_fmt;
+  logic [fpnew_pkg::INT_FORMAT_BITS-1:0] fpu_int_fmt;
 
   // APU signals
   logic apu_en;
@@ -1662,10 +1662,10 @@ module cv32e40p_id_stage
 
   always_comb begin
     if (FPU == 1) begin
-      assert (APU_NDSFLAGS_CPU >= C_RM+2*cv32e40p_fpu_pkg::FP_FORMAT_BITS+cv32e40p_fpu_pkg::INT_FORMAT_BITS)
+      assert (APU_NDSFLAGS_CPU >= C_RM+2*fpnew_pkg::FP_FORMAT_BITS+fpnew_pkg::INT_FORMAT_BITS)
       else
         $error("[apu] APU_NDSFLAGS_CPU APU flagbits is smaller than %0d",
-               C_RM + 2 * cv32e40p_fpu_pkg::FP_FORMAT_BITS + cv32e40p_fpu_pkg::INT_FORMAT_BITS);
+               C_RM + 2 * fpnew_pkg::FP_FORMAT_BITS + fpnew_pkg::INT_FORMAT_BITS);
     end
   end
 
