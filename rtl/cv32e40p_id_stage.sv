@@ -1027,6 +1027,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
     assign shadow_be_o = '0;
     assign shadow_addr_o = '0;
     assign shadow_wdata_o = '0;
+    assign shadow_ready = 1'b1; // no shadow controller: report ready (unused, gated by shadow_en_i)
   end
 
   ///////////////////////////////////////////////
@@ -1461,6 +1462,7 @@ module cv32e40p_id_stage import cv32e40p_pkg::*; import cv32e40p_apu_core_pkg::*
       .current_priv_lvl_i   ( current_priv_lvl_i )
     );
     assign irq_id_ctrl[4:0] = irq_id_clint;
+    assign irq_level_ctrl   = '0; // no CLIC: interrupt level unused
 
   end
   endgenerate
